@@ -1,0 +1,12 @@
+-- Fixture for FlatUseSystemFactoryTest: a trivial ASSL procedure that
+-- creates two linked Node objects. Node/LinksTo come from
+-- BoundedDegree.use (see examples/MLM-USE) -- a genuine multi-level
+-- model, not a plain-USE toy -- flattened by FlatUseSystemFactory before
+-- this procedure ever runs against it.
+procedure makeLinkedNodes()
+  var n1: Node, n2: Node;
+begin
+  n1 := Create(Node);
+  n2 := Create(Node);
+  Insert(LinksTo, [n1], [n2]);
+end;

@@ -1,8 +1,8 @@
 package org.tzi.use.tools.catuselatex;
 
 import org.tzi.use.uml.mm.*;
-import org.tzi.use.uml.ocl.expr.ExpressionPrintVisitor;
-import org.tzi.use.uml.ocl.expr.ExpressionVisitor;
+import org.tzi.use.uml.ocl.expr.*;
+import org.tzi.use.uml.ocl.type.EnumType;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -74,28 +74,88 @@ public class FlatUseTextRenderer {
         out.println("model " + displayName);
         out.println();
 
+        // Enum types: a per-level enum is declared inside that level's own
+        // model block (its literals/name live in level.enumTypes()), while
+        // an inter-enum -- owned by no single constituent model, typing an
+        // attribute on an inter-class -- lives in the multi-level model's
+        // own enumTypes() instead (see MMultiLevelModel's "steal fields"
+        // constructor, which copies exactly the inter ones there). Neither
+        // was ever printed here at all before this fix, so any class
+        // referencing an enum type -- inter or per-level -- pointed at a
+        // type the flattened output never declared. Enum names aren't
+        // "Level@Name" qualified the way class names are (they're already
+        // flat/global identifiers -- see e.g. EnumViaInterEnum.use), so no
+        // flatten()/shortNameCounts disambiguation is needed for them.
+        Map<String, EnumType> enumsByName = new TreeMap<>();
+        for (EnumType et : mlm.enumTypes()) {
+            enumsByName.put(et.name(), et);
+        }
+        for (MModel level : mlm.models()) {
+            for (EnumType et : level.enumTypes()) {
+                enumsByName.put(et.name(), et);
+            }
+        }
+        for (EnumType et : enumsByName.values()) {
+            printEnumType(out, et);
+        }
+        if (!enumsByName.isEmpty()) {
+            out.println();
+        }
+
         List<MClass> allClasses = new ArrayList<>();
         for (MModel level : orderedLevels(mlm)) {
             List<MClass> classes = new ArrayList<>(level.classes());
             classes.sort(Comparator.comparing(MClass::name));
             allClasses.addAll(classes);
         }
+        // Inter-classes -- owned by no single constituent model -- were
+        // never added here at all, so an inter-association referencing one
+        // (now printed, per the fix above) used to end up pointing at a
+        // class the flattened output never declared in the first place.
+        List<MClass> interClasses = new ArrayList<>(mlm.interClasses());
+        interClasses.sort(Comparator.comparing(MClass::name));
+        allClasses.addAll(interClasses);
 
         Map<String, Long> shortNameCounts = new HashMap<>();
         for (MClass cls : allClasses) {
             shortNameCounts.merge(classPart(cls.name()), 1L, Long::sum);
         }
 
+        // An association class is simultaneously an MClass and an
+        // MAssociation (MAssociationClassImpl implements both), and
+        // mlm.interClasses()/mlm.interAssociations() both hand it back --
+        // it's registered in the multi-model's fClasses AND fAssociations
+        // maps at once. Printed through the generic class loop below AND
+        // the generic association loop, that produced two conflicting
+        // declarations of the same name ("Model already contains a class
+        // `Membership'"). It's printed exactly once instead, via its own
+        // proper "associationclass ... between ... end" form -- skipped in
+        // both generic loops below.
         for (MClass cls : allClasses) {
-            printClass(out, cls, mlm, shortNameCounts);
+            if (cls instanceof MAssociationClass) {
+                printAssociationClass(out, (MAssociationClass) cls, shortNameCounts);
+            } else {
+                printClass(out, cls, mlm, shortNameCounts);
+            }
         }
 
         for (MModel level : orderedLevels(mlm)) {
             List<MAssociation> assocs = new ArrayList<>(level.associations());
             assocs.sort(Comparator.comparing(MAssociation::name));
             for (MAssociation assoc : assocs) {
+                if (assoc instanceof MAssociationClass) continue;
                 printAssociation(out, assoc, shortNameCounts);
             }
+        }
+        // Inter-associations connect classes across two different
+        // constituent models directly (no clabject/mediator relationship
+        // between the models involved) -- omitted here previously, which
+        // silently dropped them from the flattened output entirely.
+        List<MAssociation> interAssocs = new ArrayList<>(mlm.interAssociations());
+        interAssocs.sort(Comparator.comparing(MAssociation::name));
+        for (MAssociation assoc : interAssocs) {
+            if (assoc instanceof MAssociationClass) continue;
+            printAssociation(out, assoc, shortNameCounts);
         }
         out.println();
 
@@ -147,9 +207,45 @@ public class FlatUseTextRenderer {
 
     private static void printClass(PrintWriter out, MClass cls, MMultiLevelModel mlm,
                                     Map<String, Long> shortNameCounts) {
-        out.println("class " + flatten(cls.name(), shortNameCounts));
+        // Direct parents that can be losslessly represented as plain-USE
+        // "<" inheritance: a same-level generalization edge always can (it
+        // has no cancellation mechanism at all, so a subclass unconditionally
+        // gets everything); a clabject edge only can when it renames/removes
+        // nothing -- see safePassThroughParents's own doc comment for why
+        // this distinction matters and what breaks without it.
+        List<MClass> safeParents = safePassThroughParents(cls, mlm);
 
-        List<MAttribute> attrs = new ArrayList<>(cls.allAttributes());
+        StringBuilder header = new StringBuilder("class ").append(flatten(cls.name(), shortNameCounts));
+        if (!safeParents.isEmpty()) {
+            List<String> names = new ArrayList<>();
+            for (MClass p : safeParents) names.add(flatten(p.name(), shortNameCounts));
+            header.append(" < ").append(String.join(", ", names));
+        }
+        out.println(header);
+
+        // Attributes already supplied by a safeParent will arrive via the
+        // "<" just printed, and must NOT also be restated here, or the
+        // flattened output would redeclare the same attribute twice.
+        // Compared by NAME, not object identity or equals(): identity fails
+        // because MInternalClassImpl.allAttributes() is uncached, so calling
+        // it twice for the same class (once here, once for cls's own list)
+        // hands back two distinct MInternalAttribute objects for a renamed
+        // attribute (confirmed empirically -- see known-issues.org); and
+        // MInternalAttribute's own equals() is separately known-asymmetric
+        // with its superclass. Name comparison sidesteps both: attribute
+        // names are already unique across a class's whole specialization
+        // hierarchy (enforced by MClassImpl.addAttribute()'s own conflict
+        // check), so in any model that compiled at all, the same name
+        // reaching cls always means the same conceptual attribute.
+        Set<String> suppliedBySafeParent = new HashSet<>();
+        for (MClass p : safeParents) {
+            for (MAttribute a : p.allAttributes()) suppliedBySafeParent.add(a.name());
+        }
+
+        List<MAttribute> attrs = new ArrayList<>();
+        for (MAttribute a : cls.allAttributes()) {
+            if (!suppliedBySafeParent.contains(a.name())) attrs.add(a);
+        }
         if (!attrs.isEmpty()) {
             attrs.sort(Comparator.comparing(MAttribute::name));
             out.println("attributes");
@@ -159,19 +255,70 @@ public class FlatUseTextRenderer {
         }
         out.println("end");
 
+        // Same reasoning for roles: a role navigable through a safeParent
+        // arrives automatically via "<", so it drops out of the "not
+        // restated" note below; only a role that genuinely has no
+        // plain-USE-expressible path (from a renaming/cancelling clabject
+        // parent) still needs the comment.
+        Set<String> roleSuppliedBySafeParent = new HashSet<>();
+        for (MClass p : safeParents) roleSuppliedBySafeParent.addAll(p.navigableEnds().keySet());
+
         Set<String> inheritedRoles = new TreeSet<>(cls.navigableEnds().keySet());
         if (cls instanceof MInternalClassImpl) {
             inheritedRoles.removeAll(((MInternalClassImpl) cls).navigableElements().keySet());
         }
-        if (!inheritedRoles.isEmpty()) {
+        inheritedRoles.removeAll(roleSuppliedBySafeParent);
+
+        // Of what's left (reachable only through a renaming/cancelling
+        // clabject parent, so "<" is off the table -- see
+        // safePassThroughParents), a genuine SELF-association (every end
+        // originally declared on the very class this clabject renamed) can
+        // still be made reachable: restate it with every end retyped to
+        // cls's own flattened name, since cls has no "<" relation to the
+        // original declaring class in this output and so cannot otherwise
+        // participate in an association typed by that class at all. Left
+        // as a "not restated" comment for anything less uniform (a
+        // multi-class association, or one only partially reachable) --
+        // this stays a bounded, transparent restatement, not an attempt at
+        // a fully general n-ary/multi-clabject reconstruction.
+        Set<MAssociation> assocsToRestate = new LinkedHashSet<>();
+        Set<String> stillUnrestated = new TreeSet<>();
+        for (String role : inheritedRoles) {
+            MNavigableElement nav = cls.navigableEnds().get(role);
+            MAssociation assoc = nav.association();
+            boolean pureSelfAssociation = true;
+            MClass declaringClass = null;
+            for (MAssociationEnd end : assoc.associationEnds()) {
+                if (declaringClass == null) {
+                    declaringClass = end.cls();
+                } else if (!declaringClass.equals(end.cls())) {
+                    pureSelfAssociation = false;
+                    break;
+                }
+            }
+            if (pureSelfAssociation) {
+                assocsToRestate.add(assoc);
+            } else {
+                stillUnrestated.add(role);
+            }
+        }
+        for (MAssociation assoc : assocsToRestate) {
+            printAssociationRetyped(out, assoc, cls, shortNameCounts);
+        }
+        if (!stillUnrestated.isEmpty()) {
             out.println("-- " + flatten(cls.name(), shortNameCounts) + " also inherits navigable role(s) "
-                    + String.join(", ", inheritedRoles)
+                    + String.join(", ", stillUnrestated)
                     + " from its powerclass (not restated as a separate association here)");
         }
 
+        // And for invariants: plain USE already re-checks a superclass's
+        // own invariant against every subclass automatically, so an
+        // invariant declared directly on a safeParent needs no comment --
+        // it's genuinely, automatically inherited via the "<" above, not
+        // merely noted as such.
         List<String> inheritedInvariants = new ArrayList<>();
         for (MClassInvariant inv : mlm.allClassInvariants(cls)) {
-            if (!inv.cls().equals(cls)) {
+            if (!inv.cls().equals(cls) && !safeParents.contains(inv.cls())) {
                 inheritedInvariants.add(flatten(inv.name(), shortNameCounts));
             }
         }
@@ -184,6 +331,44 @@ public class FlatUseTextRenderer {
         out.println();
     }
 
+    /**
+     * Direct parents of {@code cls} that plain-USE "&lt;" can represent
+     * without changing what's reachable through them: a same-level
+     * generalization edge always qualifies (plain USE inheritance has no
+     * cancellation mechanism at all, so nothing is ever lost); a clabject
+     * edge qualifies only when it renames or removes nothing at all, since
+     * plain "&lt;" -- unlike a clabject -- cannot subtract or rename an
+     * inherited attribute/role/constraint (see this file's class-level
+     * doc comment for why that asymmetry exists in the first place).
+     * Getting this distinction wrong in either direction is a real bug,
+     * not a style choice: using "&lt;" for a renaming/cancelling clabject
+     * would silently resurrect what it removed; never using "&lt;" at all
+     * (this method's precursor) leaves a pass-through class's inherited
+     * associations unreachable in the flattened, re-parsed model, since
+     * they were only ever explained in a comment.
+     */
+    private static List<MClass> safePassThroughParents(MClass cls, MMultiLevelModel mlm) {
+        List<MClass> result = new ArrayList<>();
+        for (MClass parent : cls.parents()) {
+            Set<MGeneralization> edges = mlm.generalizationGraph().edgesBetween(cls, parent);
+            MGeneralization edge = edges.stream().findFirst().orElse(null);
+            if (edge == null) continue;
+            if (!(edge instanceof MClabject)) {
+                // A same-level "class Child < Parent" edge: always safe.
+                result.add(parent);
+                continue;
+            }
+            MClabject clabject = (MClabject) edge;
+            if (clabject.getRemovedAttributes().isEmpty()
+                    && clabject.getAttributeRenaming().isEmpty()
+                    && clabject.getRemovedConstraints().isEmpty()
+                    && clabject.getRemovedRoles().isEmpty()) {
+                result.add(parent);
+            }
+        }
+        return result;
+    }
+
     private static void printAssociation(PrintWriter out, MAssociation assoc, Map<String, Long> shortNameCounts) {
         out.println("association " + flatten(assoc.name(), shortNameCounts) + " between");
         for (MAssociationEnd end : assoc.associationEnds()) {
@@ -194,13 +379,176 @@ public class FlatUseTextRenderer {
         out.println();
     }
 
+    /**
+     * Prints one enum type declaration. Enum type names are already flat,
+     * global identifiers -- unlike class names, they carry no "Level@"
+     * qualification and so need no flatten()/shortNameCounts handling (see
+     * the call site's comment for why).
+     */
+    private static void printEnumType(PrintWriter out, EnumType et) {
+        List<String> literals = new ArrayList<>();
+        et.literals().forEachRemaining(literals::add);
+        out.println("enum " + et.name() + " {" + String.join(", ", literals) + "}");
+    }
+
+    /**
+     * Prints an association class -- an {@code MAssociationClass} is
+     * simultaneously an {@code MClass} and an {@code MAssociation} -- as a
+     * single plain-USE {@code associationclass ... between ... end} block,
+     * exactly once. Currently reachable only through inter-classes (a
+     * {@code model ... end} block declaring one is rejected at compile time
+     * -- see known-issues.org, Issue 1), so unlike printClass, this doesn't
+     * need to handle inheritance/cancellation at all. Its invariants, like
+     * any other class's, are printed separately in the trailing
+     * {@code constraints} section by the caller (it's kept in allClasses
+     * for exactly that reason), so this only needs the ends and attributes.
+     */
+    private static void printAssociationClass(PrintWriter out, MAssociationClass ac,
+                                                Map<String, Long> shortNameCounts) {
+        out.println("associationclass " + flatten(ac.name(), shortNameCounts) + " between");
+        for (MAssociationEnd end : ac.associationEnds()) {
+            out.println("  " + flatten(end.cls().name(), shortNameCounts) + "[" + end.multiplicity() + "] role " + end.name());
+        }
+        List<MAttribute> attrs = new ArrayList<>(ac.allAttributes());
+        attrs.sort(Comparator.comparing(MAttribute::name));
+        if (!attrs.isEmpty()) {
+            out.println("attributes");
+            for (MAttribute attr : attrs) {
+                out.println("  " + attr.name() + " : " + flatten(attr.type().toString(), shortNameCounts));
+            }
+        }
+        out.println("end");
+        out.println();
+    }
+
+    /**
+     * Restates a genuine self-association (every end originally declared on
+     * the same class) for a descendant class that inherits it through a
+     * renaming/cancelling clabject edge -- see printClass's own comment on
+     * why "&lt;" can't be used to make it reachable there instead. Every
+     * end is retyped to {@code cls}'s own flattened name (the only option:
+     * cls has no "&lt;" relation to the original declaring class in this
+     * output, so it cannot otherwise participate in an association typed
+     * by that class at all), keeping the original role names and
+     * multiplicities. Named "OriginalName__AT__ClassName" to avoid
+     * colliding with the association already printed once at its own
+     * original declaring class.
+     */
+    private static void printAssociationRetyped(PrintWriter out, MAssociation assoc, MClass cls,
+                                                  Map<String, Long> shortNameCounts) {
+        String clsName = flatten(cls.name(), shortNameCounts);
+        out.println("association " + flatten(assoc.name(), shortNameCounts) + "__AT__" + clsName + " between");
+        for (MAssociationEnd end : assoc.associationEnds()) {
+            out.print("  " + clsName + "[" + end.multiplicity() + "] role " + end.name());
+            out.println();
+        }
+        out.println("end");
+        out.println();
+    }
+
+    /**
+     * An {@link ExpressionPrintVisitor} that omits a query iterator
+     * variable's explicit type annotation -- e.g. prints
+     * "forAll(n | ...)" rather than the base class's default
+     * "forAll(n:Vertex | ...)". Plain OCL syntax always makes this
+     * annotation optional (see USE's own grammar: {@code
+     * elemVarsDeclaration}'s {@code (COLON type)?} is optional, unlike
+     * {@code variableInitialization}'s, which is mandatory -- see below),
+     * and the iterator's type is always re-inferable from the actual
+     * (possibly retyped, in this renderer's flattened output) collection
+     * it ranges over. Printing the ORIGINAL model's frozen annotation
+     * verbatim -- what the base class does -- can therefore describe a
+     * type that no longer matches the flattened collection's element type
+     * at all: printAssociationRetyped (see its own doc comment) retypes a
+     * self-association's ends to the inheriting class for reachability,
+     * but an invariant using that association was already compiled
+     * against its association's ORIGINAL declared element type, and the
+     * compiled expression tree -- which is all this renderer ever
+     * re-prints -- keeps that original type forever. (Example: known-
+     * issues.org's GraphColoring -- ColoredVertex inherits Vertex's
+     * self-association AdjacentTo through a renaming clabject edge, so
+     * it's restated retyped to ColoredVertex; but ProperColoring's
+     * "self.neighbors->forAll(n | ...)" was compiled when "neighbors"
+     * still meant Set(Vertex), so the base printer's "n:Vertex" no longer
+     * matches the retyped Set(ColoredVertex) it actually ranges over in
+     * the flattened text, and plain USE rejects the mismatch outright.)
+     *
+     * <p>The accumulator variable of an "iterate(...; acc:T = init | ...)"
+     * is left fully typed -- unlike a query iterator variable, plain OCL
+     * requires its type explicitly, so it can't be omitted at all.
+     *
+     * <p>Suppression is scoped tightly around printing just the iterator
+     * variable declaration(s) of the query expression actually being
+     * visited -- restored to its prior value before the accumulator
+     * (if any) and the body are printed -- so it never leaks into a
+     * nested query expression's own (independently suppressed) iterator
+     * variable.
+     */
+    private static class RetypingSafeExpressionPrintVisitor extends ExpressionPrintVisitor {
+        private boolean suppressVarDeclType = false;
+
+        RetypingSafeExpressionPrintVisitor(PrintWriter writer) {
+            super(writer);
+        }
+
+        @Override
+        public void visitVarDecl(VarDecl varDecl) {
+            if (suppressVarDeclType) {
+                writer.write(variable(varDecl.name(), null));
+            } else {
+                super.visitVarDecl(varDecl);
+            }
+        }
+
+        private void printQueryOmittingIteratorType(ExpQuery exp, VarInitializer accuInit) {
+            exp.getRangeExpression().processWithVisitor(this);
+            writer.write(operator("->", exp));
+            writer.write(operation(exp.name(), exp));
+            writer.write(operator("(", exp));
+            writer.write(ws());
+
+            boolean prev = suppressVarDeclType;
+            suppressVarDeclType = true;
+            exp.getVariableDeclarations().processWithVisitor(this);
+            suppressVarDeclType = prev;
+
+            if (accuInit != null) {
+                writer.write(operator(";", exp));
+                writer.write(ws());
+                accuInit.getVarDecl().processWithVisitor(this);
+                writer.write(operator("=", exp));
+                accuInit.initExpr().processWithVisitor(this);
+            }
+            writer.write(ws());
+            writer.write(operator("|", exp));
+            writer.write(ws());
+            exp.getQueryExpression().processWithVisitor(this);
+            writer.write(ws());
+            writer.write(operator(")", exp));
+        }
+
+        @Override public void visitQuery(ExpQuery exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitForAll(ExpForAll exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitExists(ExpExists exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitSelect(ExpSelect exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitReject(ExpReject exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitCollect(ExpCollect exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitCollectNested(ExpCollectNested exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitIsUnique(ExpIsUnique exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitSortedBy(ExpSortedBy exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitOne(ExpOne exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitAny(ExpAny exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitClosure(ExpClosure exp) { printQueryOmittingIteratorType(exp, null); }
+        @Override public void visitIterate(ExpIterate exp) { printQueryOmittingIteratorType(exp, exp.getAccuInitializer()); }
+    }
+
     private static void printInvariant(PrintWriter out, MClassInvariant inv, Map<String, Long> shortNameCounts) {
         out.print("context " + flatten(inv.cls().name(), shortNameCounts) + " inv " + flatten(inv.name(), shortNameCounts) + ":");
         out.println();
         out.print("  ");
         StringWriter bodySw = new StringWriter();
         PrintWriter bodyPw = new PrintWriter(bodySw);
-        ExpressionVisitor visitor = new ExpressionPrintVisitor(bodyPw);
+        ExpressionVisitor visitor = new RetypingSafeExpressionPrintVisitor(bodyPw);
         inv.bodyExpression().processWithVisitor(visitor);
         bodyPw.flush();
         out.println(flatten(bodySw.toString(), shortNameCounts));

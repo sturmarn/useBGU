@@ -3,6 +3,7 @@ package org.tzi.use.tools.catuselatex;
 import junit.framework.TestCase;
 import org.tzi.use.parser.use.USECompiler;
 import org.tzi.use.parser.use.USECompilerCatUSE;
+import org.tzi.use.parser.use.USECompilerMLM;
 import org.tzi.use.uml.mm.MModel;
 import org.tzi.use.uml.mm.MMultiLevelModel;
 import org.tzi.use.uml.mm.ModelFactory;
@@ -120,11 +121,17 @@ public class FlatUseTextRendererTest extends TestCase {
     }
 
     /**
-     * An association role a clabject *does* still inherit (untagged,
-     * survives cancellation) is noted with a comment rather than a
-     * duplicated association block -- and the result must still reparse.
+     * A clabject edge that renames/removes nothing at all (CatMLM's
+     * {@code clabject X : Y} has no body beyond the powerclass list, so it
+     * can never do otherwise -- see VehicleTaxonomy.use's own doc comment)
+     * is a safe pass-through: Dog gets a genuine "class Dog &lt; Animal"
+     * header (safePassThroughParents), so "residents" -- a role declared
+     * on Animal, never cancelled -- arrives automatically via plain-USE
+     * inheritance, with no duplicated association block and no
+     * "also inherits" comment needed (it's actually reachable, not just
+     * documented as unreachable).
      */
-    public void testSurvivingInheritedRoleIsNotedNotDuplicated() {
+    public void testSafePassThroughEdgeInheritsRoleViaPlainSubclassing() {
         String src =
                 "MLM InheritedRoleDemo\n" +
                 "\n" +
@@ -145,7 +152,9 @@ public class FlatUseTextRendererTest extends TestCase {
                 "end\n";
 
         String rendered = FlatUseTextRenderer.render(compileCatUse(src), "InheritedRoleDemo");
-        assertTrue(rendered.contains("Dog also inherits navigable role(s) residents"));
+        assertTrue(rendered.contains("class Dog < Animal"));
+        assertFalse("residents is genuinely reachable via '<' now, so no 'also inherits' comment is needed",
+                rendered.contains("Dog also inherits navigable role"));
         assertEquals(1, countOccurrences(rendered, "association livesIn"));
 
         StringWriter errBuf = new StringWriter();
@@ -154,7 +163,72 @@ public class FlatUseTextRendererTest extends TestCase {
                 new ByteArrayInputStream(rendered.getBytes(StandardCharsets.UTF_8)),
                 "flat.use", err, new ModelFactory());
         err.flush();
-        assertNotNull("flattened text with an inherited-role comment failed to re-parse:\n" + errBuf, reparsed);
+        assertNotNull("flattened text with a safe pass-through subclass failed to re-parse:\n" + errBuf, reparsed);
+    }
+
+    /**
+     * CatMLM's {@code clabject} has no renaming/cancellation mechanism at
+     * all (see the test above), so the "stillUnrestated" comment path --
+     * a multi-type (non-self) association role inherited through a
+     * genuinely renaming/cancelling clabject edge, ineligible for both
+     * safePassThroughParents' "&lt;" and printAssociationRetyped's
+     * self-association restatement -- can only be reached via MLM-USE's
+     * own richer "mediator ... clabject X : Y attributes a -&gt; b end"
+     * syntax, so this uses USECompilerMLM directly instead of CatUSE.
+     */
+    public void testUnrestatableRoleThroughCancellingEdgeIsNotedNotDuplicated() {
+        String src =
+                "MLM InheritedRoleDemo\n" +
+                "\n" +
+                "model Meta\n" +
+                "class Animal\n" +
+                "attributes\n" +
+                "legs: Integer\n" +
+                "end\n" +
+                "\n" +
+                "class Habitat\n" +
+                "end\n" +
+                "\n" +
+                "association livesIn between\n" +
+                "Animal[1] role home\n" +
+                "Habitat[*] role residents\n" +
+                "end\n" +
+                "\n" +
+                "model Instances\n" +
+                "class Dog\n" +
+                "end\n" +
+                "\n" +
+                "mediator Meta < NONE\n" +
+                "end\n" +
+                "\n" +
+                "mediator Instances < Meta\n" +
+                "clabject Dog : Animal\n" +
+                "attributes\n" +
+                "legs -> paws\n" +
+                "end\n" +
+                "end\n";
+
+        StringWriter errBuf = new StringWriter();
+        PrintWriter err = new PrintWriter(errBuf);
+        MMultiLevelModel mlm = USECompilerMLM.compileMLMSpecification(
+                new ByteArrayInputStream(src.getBytes(StandardCharsets.UTF_8)),
+                "mlm-renderer-test.use", err, new MultiLevelModelFactory());
+        err.flush();
+        assertNotNull("MLM-USE compilation failed:\n" + errBuf, mlm);
+
+        String rendered = FlatUseTextRenderer.render(mlm, "InheritedRoleDemo");
+        assertFalse("the renaming edge rules Dog out of safePassThroughParents, so it must not get 'class Dog < Animal'",
+                rendered.contains("class Dog < Animal"));
+        assertTrue(rendered.contains("Dog also inherits navigable role(s) residents"));
+        assertEquals(1, countOccurrences(rendered, "association livesIn"));
+
+        StringWriter errBuf2 = new StringWriter();
+        PrintWriter err2 = new PrintWriter(errBuf2);
+        MModel reparsed = USECompiler.compileSpecification(
+                new ByteArrayInputStream(rendered.getBytes(StandardCharsets.UTF_8)),
+                "flat.use", err2, new ModelFactory());
+        err2.flush();
+        assertNotNull("flattened text with an inherited-role comment failed to re-parse:\n" + errBuf2 + "\n---\n" + rendered, reparsed);
     }
 
     /**
