@@ -170,7 +170,7 @@ for a CI step that should fail the build on a broken model.
 
 To confirm the build actually works end to end, try opening one of the
 worked examples that ship in the repository's own =examples/=
-directory, e.g. =examples/USE/Vehicle.use=, with "Open
+directory, e.g. =examples/USE/202608282106-Vehicle.use=, with "Open
 specification...". Chapter [[#chap-quickstart-tutorial]] walks through
 a small model like this one in full, from writing it to checking its
 first invariant.

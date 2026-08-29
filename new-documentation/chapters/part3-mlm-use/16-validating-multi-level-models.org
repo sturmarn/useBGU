@@ -1,0 +1,146 @@
+* Validating Multi-Level Models
+:PROPERTIES:
+:CUSTOM_ID: chap-validating-mlm
+:END:
+
+#+INDEX: validation!multi-level models
+
+This chapter is an early draft: the underlying design question --- how
+*should* a multi-level model be validated, and how much of that can
+reasonably be retrofitted onto tools that were never built with levels
+in mind --- is still open. What follows is accurate as of this
+writing, but expect it to be revised as that design settles.
+
+Chapter [[#chap-validating-specifications]] covers validation for plain
+USE. Everything there --- structural checking, invariant evaluation,
+snapshot generation, bounded model finding --- exists as a real,
+usable tool. This chapter is about what happens to each of those tools
+once levels, clabjects, and inter-level constructs enter the picture.
+
+** What "Validating a Model" Means in USE
+:PROPERTIES:
+:CUSTOM_ID: sec-validation-taxonomy
+:END:
+
+USE actually ships several distinct things under the umbrella of
+"validation," and it matters which one is meant:
+
+- *Structural checking* --- does the model itself parse and
+  type-check (multiplicities, navigability, redefinition rules, and so
+  on)? This is what the compiler already does; nothing here is
+  specific to runtime state at all.
+- *Invariant evaluation against a system state* --- given a concrete,
+  already-populated set of objects and links, does every invariant
+  hold? This is ordinary OCL evaluation, nothing more.
+- *Snapshot generation* (ASSL, the =generate= shell commands) ---
+  backtracking search that actually *builds* a concrete population of
+  objects and links satisfying a set of constraints, guided by a
+  user-written procedure (=Create=, =CreateN=, =Insert=, =Try=, =Any=,
+  ...). This is the closest thing USE has to "show me a model of my
+  constraints."
+- *Bounded model finding* --- a SAT/CSP-based search over a
+  finite-size universe, bundled with this fork as a plugin (see
+  [[#sec-kodkod-plugin]] in the next chapter). Conceptually similar to
+  Alloy's Kodkod-based analyzer.
+
+#+begin_manualnote
+=checkPartialSatisfiability()= / =checkWellDefinednessState()= --- the
+two methods behind well-definedness checking --- are *not* a solver.
+Each call constructs exactly one, arbitrary, concrete witness state
+(every attribute defaulted to =UndefinedValue=) and evaluates the
+invariant against *that single state*. It is not an existential search
+over all possible states, and a =false= result does not mean "no
+witness exists" --- only that this particular default-constructed one
+doesn't satisfy it. It is easy to over-read what this check actually
+proves; it proves less than "satisfiable" or "unsatisfiable" in the
+logical sense.
+#+end_manualnote
+
+** The Multi-Level Blind Spot
+:PROPERTIES:
+:CUSTOM_ID: sec-multilevel-blind-spot
+:END:
+
+#+INDEX: validation!architectural blind spot
+
+None of the four tools above were designed with multi-level constructs
+in mind, and this is not a minor omission:
+
+- A clabject's *cancellation* (a removed attribute, a renamed
+  attribute, a removed role, a removed constraint --- see Chapter
+  [[#chap-mlm-concepts]]) is resolved on demand, in memory, by
+  =MInternalClassImpl='s own bookkeeping. A plain-USE-shaped tool that
+  simply walks =MClass=/=MAssociation= navigation --- which is exactly
+  what =MSystem= and the ASSL generator (=GGenerator=) do --- sees the
+  *raw*, unflattened per-level class, cancellation and all still
+  present.
+- *Inter-classes*, *inter-associations*, and *inter-constraints* ---
+  constructs owned by no single constituent model at all --- live only
+  in the multi-level model's own bookkeeping
+  (=MMultiModel.interClasses()=/=interAssociations()=/
+  =interConstraints()=). A tool scoped to one constituent =MModel= at a
+  time never sees them.
+
+Handed an =MMultiLevelModel= directly, =GGenerator= happily starts
+generating against the *raw* per-level classes --- not an error, not a
+warning, just silently wrong: cancelled attributes reappear, renamed
+ones keep their original name, and inter-level constraints are never
+checked at all because the generator never even looks at them. This
+was confirmed directly against this fork's own =GGenerator= and
+=MSystem= code, not assumed.
+
+The bundled bounded-model-finder plugin appears, from its bytecode, to
+have the identical scoping (per-=MModel=, not multi-level-aware) --- see
+[[#sec-kodkod-plugin]] for the caveats on that finding, since it was
+established by inspection rather than by actually running it against a
+multi-level model.
+
+** Two Different Ways to Think About the Problem
+:PROPERTIES:
+:CUSTOM_ID: sec-two-ways-to-think
+:END:
+
+There are two genuinely different research angles on "validate a
+model with an unbounded, or merely very large, population of linked
+objects," worth keeping apart:
+
+1. *Bounded, concrete techniques.* Snapshot generation and bounded
+   model finding both work by actually constructing --- or searching
+   over --- specific, finite object populations. They tell you
+   something true about the instances they build, but they say
+   nothing about instance counts beyond whatever bound was configured.
+   This is what USE actually does today, multi-level or not.
+2. *Abstract, unbounded reasoning.* Shape analysis, and in particular
+   parametric shape analysis via three-valued logic (TVLA)
+   @@latex:\cite{SagivRepsWilhelm:2002}@@, reasons about the shape of a linked
+   data structure --- how many objects, of what class, connected how
+   --- *without ever instantiating a specific population at all*. This
+   is the right theoretical framing for a question like "can this
+   multi-level model's constraints ever be satisfied by *any* size of
+   population," but nothing in this fork attempts it; it is mentioned
+   here as a pointer for future work, not as a described feature.
+
+A related, purely theoretical point worth knowing when judging what's
+achievable here at all: OCL's own expressive power depends on which
+version is in play. OCL 1.4/1.5 expressions are Turing-complete;
+OCL 2.0 expressions, restricted to guarantee termination, are exactly
+the primitive recursive functions @@latex:\cite{CengarleKnapp:2004}@@. This fork
+was confirmed (empirically, not merely by reading the grammar) to
+behave like the *unrestricted*, Turing-complete variant --- unbounded
+recursion runs until a genuine =StackOverflowError= (caught and
+re-thrown as a plain =RuntimeException=, not statically rejected). That
+matters here because it rules out any hope of a general, exhaustive,
+*static* verification procedure for arbitrary OCL constraints in this
+system, multi-level or not: the underlying constraint language is, by
+construction, too expressive for that. Whatever validation strategy
+this fork eventually settles on for multi-level models, it will --- like
+every other OCL tool of this kind --- be bounded, or heuristic, or
+both, not a decision procedure.
+
+#+begin_manualwarning
+This is an open design area, not a finished feature. The next chapter
+describes the one concrete step taken so far --- making the existing
+bounded tools (specifically, ASSL) usable against a multi-level model
+at all, by flattening it first --- and is explicit about what still
+isn't wired up.
+#+end_manualwarning

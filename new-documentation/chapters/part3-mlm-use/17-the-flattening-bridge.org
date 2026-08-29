@@ -1,0 +1,153 @@
+* The Flattening Bridge
+:PROPERTIES:
+:CUSTOM_ID: chap-flattening-bridge
+:END:
+
+#+INDEX: validation!flattening bridge
+#+INDEX: FlatUseSystemFactory
+
+This chapter describes the one concrete step taken so far on the open
+question raised in Chapter [[#chap-validating-mlm]]: making an existing
+bounded validation tool --- specifically, ASSL snapshot generation ---
+actually work correctly against a multi-level model, rather than
+silently generating against its raw, unflattened structure. It does
+not resolve the larger design question; it makes one tool usable while
+that question stays open, and it is explicit below about what still
+isn't done.
+
+** The Idea
+:PROPERTIES:
+:CUSTOM_ID: sec-flattening-idea
+:END:
+
+The fix isn't to make =GGenerator= multi-level-aware --- that would be
+a substantially larger undertaking than this fork's scope. It's to
+hand it something it already understands correctly: an ordinary,
+single-level =MModel=.
+
+Chapter [[#chap-flattening-and-rendering]] describes
+=FlatUseTextRenderer= --- the tool that computes exactly this. Given a
+compiled =MMultiLevelModel=, it renders every class's fully resolved,
+post-cancellation structure (attributes, roles, invariants ---
+cancellations already applied) as ordinary plain-USE text, with every
+inter-class, inter-association, and inter-constraint folded in and no
+multi-level syntax left anywhere in the output. Recompiling that text
+with the ordinary =USECompiler= (not =USECompilerMLM=) yields a plain
+=MModel= that =GGenerator= was always designed for.
+
+The pipeline, end to end:
+
+#+begin_src use
+compiled MMultiLevelModel
+        |  FlatUseTextRenderer.render(...)
+        v
+flattened plain-USE text (a "model ... end" block, no MLM syntax)
+        |  USECompiler.compileSpecification(...)
+        v
+plain MModel
+        |  new MSystem(...)
+        v
+MSystem  ---  system.generator().startProcedure(...) now just works
+#+end_src
+
+** =FlatUseSystemFactory=
+:PROPERTIES:
+:CUSTOM_ID: sec-flat-use-system-factory
+:END:
+
+=org.tzi.use.tools.catuselatex.FlatUseSystemFactory= packages the last
+three steps of that pipeline as a single call:
+
+#+begin_src use
+MSystem system = FlatUseSystemFactory.createFlattenedSystem(
+    mlm,            // an already-compiled MMultiLevelModel
+    "MyModelName",  // display name for the flattened "model" block
+    err             // PrintWriter for a recompilation failure, if any
+);
+if (system != null) {
+    system.generator().startProcedure(callString, args);
+}
+#+end_src
+
+A =null= return means the flattening itself produced text that failed
+to recompile --- a bug in =FlatUseTextRenderer=, not a problem with the
+input model (which already compiled successfully as a multi-level
+model to get this far at all).
+
+The returned =MSystem= is a *fresh, independent* system over the
+flattened model --- a different object from any =MSystem= the caller
+may already have wrapping the original =mlm=. Generation results
+(objects, links, invariant checks) live in the returned system, not in
+whichever system =mlm= itself came from. A caller juggling both needs
+to keep that distinction straight, exactly as with any two unrelated
+=MSystem= instances.
+
+** What's Verified
+:PROPERTIES:
+:CUSTOM_ID: sec-flattening-verified
+:END:
+
+- Every worked example under =examples/MLM-USE/= and =examples/CatMLM/=
+  --- including a 1000-plus-class stress-test model --- flattens and
+  recompiles cleanly as plain USE.
+- =FlatUseSystemFactoryTest= runs a real ASSL procedure end to end
+  against a flattened multi-level model via
+  =system.generator().startProcedure(...)=, and confirms the objects it
+  creates actually land in the resulting system state. Nothing in this
+  codebase exercised =startProcedure= against any model at all before
+  this test existed.
+
+** The Bundled Model-Finder Plugin
+:PROPERTIES:
+:CUSTOM_ID: sec-kodkod-plugin
+:END:
+
+#+INDEX: validation!bounded model finding
+
+This fork ships a second bounded validation tool alongside ASSL:
+=use-assembly/src/main/resources/plugins/ModelValidatorPlugin-5.2.0-r1.jar=,
+a real, bundled SAT/CSP-based model validator (built on =sat4j= and
+=choco-solver=, conceptually similar to Alloy's Kodkod-based analyzer),
+loaded into =use-gui= at startup via its =PluginRegistry=. It is a
+pre-built binary jar shipped as a packaging resource, not a Maven
+dependency of any module's own source --- worth knowing, since a plain
+source or POM grep for a solver dependency will not find it.
+
+From its bytecode, the plugin appears to be scoped the same way
+=GGenerator= is: per constituent =MModel=, with no visible awareness of
+clabjects, cancellation, or inter-level constructs. That finding rests
+on inspection, not execution --- unlike the ASSL generator (see
+[[#sec-flattening-verified]]), this plugin has not actually been run
+against a multi-level model, flattened or not, so its blind spot is
+inferred rather than empirically confirmed. Whether the flattening
+bridge above applies to it as directly as it did to ASSL --- the
+plugin has its own GUI-integrated invocation path, not a bare
+=MSystem= call --- is itself an open question.
+
+** What's Not Yet Wired Up
+:PROPERTIES:
+:CUSTOM_ID: sec-flattening-not-done
+:END:
+
+#+begin_manualwarning
+Two things deliberately stop here, both because they raise design
+questions of their own rather than being simple wiring:
+
+- *The interactive Shell.* =cmdGenStartProcedure= (the shell command
+  behind =gen startprocedure=) still operates directly on
+  =fSession.system()= --- whatever the user last =open='d, multi-level
+  or not --- with no flattening step at all. Swapping in a flattened
+  system just for that one call raises an immediate follow-on question:
+  which system do the *later* generation commands (=gen result=,
+  =gen invariant=, and friends) then operate on? The result lives in
+  the flattened system, not the original one, so every one of those
+  commands would need to know to keep using the flattened system
+  instead of silently looking at the wrong (and un-generated-into)
+  original. That's a real piece of session-state design, not yet
+  attempted.
+- *The bundled bounded model finder plugin* (see
+  [[#sec-kodkod-plugin]]) has not been run through this same bridge at
+  all. Its blind spot was established by bytecode inspection, not by
+  actually exercising it against a multi-level model the way ASSL now
+  has been.
+#+end_manualwarning

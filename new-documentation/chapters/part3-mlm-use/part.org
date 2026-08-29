@@ -7,3 +7,5 @@
 #+INCLUDE: "13-mlm-use-syntax.org" :minlevel 2
 #+INCLUDE: "14-multi-level-shell-commands.org" :minlevel 2
 #+INCLUDE: "15-worked-examples-mlm.org" :minlevel 2
+#+INCLUDE: "16-validating-multi-level-models.org" :minlevel 2
+#+INCLUDE: "17-the-flattening-bridge.org" :minlevel 2

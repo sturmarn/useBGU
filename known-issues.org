@@ -1,125 +1,34 @@
 #+TITLE: MLM-USE Compiler Issues Found While Writing Examples
 #+AUTHOR: Mayer Goldberg
-#+DATE: 2026-08-28
+#+include: /home/gmayer/work/lang/orgmode/lib/english.org :minlevel 1
 
-Both issues below were found empirically, while building the 20
-graph-theoretic examples in =examples/MLM-USE/= and =examples/CatMLM/=,
+
+Issues below were found empirically -- most while building the 20
+graph-theoretic examples in =examples/MLM-USE/= and =examples/CatMLM/=
 using a throwaway harness that calls =USECompilerMLM= / =USECompilerCatUSE=
-directly (the CLI jar has no flag that reaches those entry points). Issue
-1 was a genuine crash and has since been fixed. Issue 2 is a real gap,
-still open, with no code change made -- see its "Resolution" section for
-why.
+directly (the CLI jar has no flag that reaches those entry points);
+Issues 5-7 while making =FlatUseTextRenderer='s flattened output
+genuinely self-contained and re-compilable, checked with a similar
+throwaway harness (=FlattenRegressionCheck=) run against every file in
+=examples/=; Issue 8 is a scope boundary noted while wiring ASSL
+generation to that same flattened output. Fixed issues are filed under
+[[#done]] below; anything still open is filed under [[#open]].
 
-* Issue 1: an =associationclass= inside a model block crashed a multi-level model [FIXED 2026-08-28]
+* Open
+:PROPERTIES:
+:CUSTOM_ID: open
+:END:
 
-** Summary
+** Issue 2: an =inter-enums= enum cannot type an attribute inside a =model= block [OPEN]
 
-Declaring an =associationclass= inside an ordinary =model ... end= block
-of a multi-level (MLM/CatMLM) specification used to crash the compiler
-with a bare =ClassCastException=, and -- worse -- the crash was silently
-swallowed by a catch-all in =MMultiLevelModel='s constructor, so an
-isolated reproducer with nothing else depending on the broken class would
-print the exception's message as noise and then still report "OK" as if
-compilation had succeeded, handing back a silently-corrupted model. The
-exact same construct declared directly in =inter-classes= (the genuinely
-inter-level scope) always worked correctly -- association classes there
-are unaffected by anything in this issue.
-
-** Root cause (as found)
-
-- =MultiModelFactory.createClass()= / =createAssociation()= build the
-  multi-level-aware =MInternalClassImpl= / =MInternalAssociationImpl= types,
-  but =createAssociationClass()= just delegated to the base
-  =ModelFactory=, producing a plain =MAssociationClassImpl= -- the one
-  factory method not updated to match its siblings.
-- =MMultiLevelModel.addModel()= did
-  =model.classes().forEach(cls -> ((MInternalClassImpl)cls).setMainModel(this))=
-  -- an unconditional cast, no =instanceof= guard, so it threw the moment
-  a model contained an association class.
-- =MMultiLevelModel='s "steal all the fields from the multiModel"
-  constructor wrapped everything in one
-  =catch (Exception e) { System.out.println(e.getMessage()); }= --
-  completely silent, no error count increment, no real error-channel
-  report. Whatever fields hadn't been copied yet when this fired were
-  silently dropped, and the half-built model was still handed back as if
-  nothing had gone wrong.
-
-** Fix implemented
-
-- =MMultiLevelModel.addModel()= now checks every class in the incoming
-  model with =instanceof MInternalClassImpl= *before* the cast, and
-  throws a clear, specific =Exception= naming the offending class and
-  model if the check fails, pointing the user at =inter-classes= or at
-  reifying the link as a plain class instead.
-- The constructor's silent =catch= now rethrows as an unchecked
-  =IllegalStateException= instead of printing and continuing. This
-  required no signature changes anywhere in the call chain:
-  =ASTMultiLevelModel.gen()= already wrapped its call into this
-  constructor (via =MultiLevelModelFactory.createMLM(...)=) in a
-  =try { ... } catch (Exception e) { mlmContext.reportError(fName, e); return null; }=
-  that wasn't previously being exercised for this failure at all (a
-  runtime exception is still an =Exception=), so the existing, correct
-  error-reporting path now handles it for free.
-- Net effect: the construct is now rejected with a clean, single-cause
-  compile error instead of crashing or silently succeeding. Real
-  multi-level support for association classes was *not* added -- see
-  "Considered and rejected" below for why not.
-
-** Regression coverage added
-
-- =use-core/src/test/resources/org/tzi/use/mlmParser/associationclass_in_model_block_fail.use=
-  + matching =.fail= -- the per-model case now fails cleanly with the new
-  message (two lines: the specific cause, then the pre-existing generic
-  "error parsing multi level model" line that
-  =ASTMultiLevelModel.gen()= already appends whenever the per-model
-  generation phase reports any error -- this is pre-existing,
-  checked-in-elsewhere behavior, not something introduced by this fix;
-  see the comment at that throw site).
-- =use-core/src/test/resources/org/tzi/use/mlmParser/associationclass_in_inter_classes.use=
-  -- the =inter-classes= placement of the same construct still compiles
-  cleanly (positive control, no =.fail= file).
-- =USECompilerMLMComplexTest='s (renamed from =USECompilerMLMTestComplex=,
-  2026-08-28, so Surefire's default naming-pattern discovery actually
-  picks it up -- see below) expected file count bumped 48 -> 50.
-- Full =use-core= test suite (347 tests) and all 29 files in =examples/=
-  re-verified green after the fix.
-
-** Considered and rejected: real multi-level support for association classes
-
-An association class is simultaneously a class (participates in the
-clabject graph, child/parent : =MClass=) and an association (participates
-in the assoclink graph, child/parent : =MAssociation=) --
-=MMediator= keeps these as two entirely separate maps
-(=fClabjects= / =fAssocLinks=), and the well-definedness checker builds a
-witness for each kind separately (=createObject=for a clabject,
-=createLink= for an assoclink) with no third primitive for "an object
-that is also a link between two other objects." Making a per-model
-association class properly multi-level-aware would mean inventing a new
-edge type that is both at once, plus the consistency rules between its
-class-refinement and association-refinement facets on the same
-declaration -- semantics nobody (including the MLM paper's own authors)
-has committed to. That's a research question, not a bug fix, so it was
-deliberately left out of scope; the clean rejection above is the
-intended, final behavior for this case, not a placeholder.
-
-** Note on the examples directory
-
-=examples/= is reserved for constructs that work, by policy (2026-08-28)
--- it carries no illustration of the per-model case this issue was about,
-fixed or not. =examples/MLM-USE/InterAssociationClassBridge.use= still
-demonstrates the always-working =inter-classes= placement, since that's
-a genuine working feature, not a workaround for anything.
-
-* Issue 2: an =inter-enums= enum cannot type an attribute inside a =model= block [OPEN]
-
-** Summary
+*** Summary
 
 An enum declared in =inter-enums= types an attribute on a genuine
 =inter-classes= class without trouble, but the same enum cannot type an
 attribute declared inside an ordinary =model ... end= block: it fails
 with =Expected type name, found `Status'.=
 
-** Root cause
+*** Root cause
 
 - =ASTMultiModel.gen()='s =while (mIt.hasNext())= loop fully generates
   every =model= block (each with its own per-model =MultiContext= bound
@@ -142,7 +51,7 @@ with =Expected type name, found `Status'.=
   used only to forward error reports, never for model/type/classifier
   resolution -- the natural extension point a real fix would use.
 
-** Suggested fixes (not implemented)
+*** Suggested fixes (not implemented)
 
 1. *Principled fix*: extend =MultiContext='s existing =mainContext=
    fallback pattern to also cover type/enum resolution in
@@ -155,21 +64,525 @@ with =Expected type name, found `Status'.=
 3. *No-code option*: document as an accepted restriction, since the
    =inter-classes= workaround already covers the practical need.
 
-** Resolution: not acted on
+*** Resolution: not acted on
 
 Deliberately left open. The user's decision, communicated 2026-08-28: no
 action yet, revisit later if it becomes a practical blocker.
 
-** Note on the examples directory
+*** Note on the examples directory
 
 =examples/= is reserved for constructs that work, by policy (2026-08-28)
 -- it carries no illustration of the failing per-model case.
-=examples/MLM-USE/EnumViaInterEnum.use= still demonstrates the
+=examples/MLM-USE/202608282106-EnumViaInterEnum.use= still demonstrates the
 always-working placement (an inter-enum typing a genuine =inter-classes=
 attribute), since that's a genuine working feature, not a workaround for
 anything.
 
-* Addendum: CatMLM level-order / instanceOf name duplication (2026-08-28)
+** Issue 8: ASSL generation still isn't wired into the interactive Shell for multi-level models [OPEN]
+
+*** Summary
+
+Issues 5-7's fixes made =FlatUseTextRenderer= produce genuinely
+self-contained plain USE, and the new =FlatUseSystemFactory= (see Issue
+7's Verification, and the manual's new chapter
+=new-documentation/chapters/part3-mlm-use/17-the-flattening-bridge.org=)
+proved the ASSL snapshot generator can now run correctly against a
+multi-level model -- but only when a caller invokes that factory
+directly. The interactive Shell's =gen startprocedure= command
+(=cmdGenStartProcedure= in =use-gui='s =Shell.java=) still generates
+directly against whatever =fSession.system()= currently wraps, with no
+flattening step at all -- =open=-ing a multi-level model and then
+running =gen startprocedure= silently generates against the raw,
+unflattened per-level classes, in exactly the way the manual's "The
+Multi-Level Blind Spot" section describes.
+
+*** Why this is a design question, not a one-line fix
+
+If =cmdGenStartProcedure= swapped in a flattened =MSystem= just for that
+one call, every *later* generation command in the same shell session --
+=gen result=, =gen invariant=, =gen printloadedinvariants=, and so on,
+all of which read =system.generator()='s state -- would need to know to
+keep operating on that *same* flattened system afterward, not on the
+original =fSession.system()=, or the generated result becomes
+invisible (it lives in the flattened system, which nothing else in the
+session would be looking at). That's a piece of session-state design
+(where does the flattened side-system live across commands, how is it
+invalidated if the user re-=open=s or edits the model, ...), not a
+mechanical call to =FlatUseSystemFactory=.
+
+*** Suggested approach (not implemented)
+
+1. In =cmdGenStartProcedure=, check
+   =system().model() instanceof MMultiLevelModel=; if so, build (or
+   reuse a per-session-cached) flattened =MSystem= via
+   =FlatUseSystemFactory.createFlattenedSystem(...)= and generate
+   against *that* instead of =system()= directly.
+2. Every other =gen *= shell command reading generation state
+   (=cmdGenResult=, =cmdGenInvariantFlags=, =cmdGenPrintLoadedInvariants=,
+   ...) would need the identical check, consistently choosing the
+   cached flattened system over =system()= whenever one exists for the
+   current session.
+3. Needs an explicit decision on the flattened side-system's lifetime:
+   at minimum, it must be invalidated (and rebuilt) if the user
+   =open=s a different model or otherwise changes =fSession='s system
+   mid-session.
+
+*** Also not yet run through the bridge
+
+The bundled bounded model finder plugin
+(=ModelValidatorPlugin-5.2.0-r1.jar=, see the manual's
+=sec-kodkod-plugin= section in the same new chapter) has the same
+architectural blind spot by bytecode inspection, but -- unlike ASSL --
+has not been run against a multi-level model at all, flattened or not;
+whether it can even use =FlatUseSystemFactory= as directly as ASSL did
+(it has its own GUI-integrated invocation path, not a bare =MSystem=
+call) is itself unresolved.
+
+*** Resolution: not acted on
+
+Deliberately left open at the user's explicit direction (2026-08-28):
+asked whether to design and implement the Shell wiring now versus
+stop at the standalone, tested =FlatUseSystemFactory= library entry
+point; the user chose to stop there for the time being.
+
+* Done
+:PROPERTIES:
+:CUSTOM_ID: done
+:END:
+
+** Issue 1: an =associationclass= inside a model block crashed a multi-level model [FIXED 2026-08-28]
+
+*** Summary
+
+Declaring an =associationclass= inside an ordinary =model ... end= block
+of a multi-level (MLM/CatMLM) specification used to crash the compiler
+with a bare =ClassCastException=, and -- worse -- the crash was silently
+swallowed by a catch-all in =MMultiLevelModel='s constructor, so an
+isolated reproducer with nothing else depending on the broken class would
+print the exception's message as noise and then still report "OK" as if
+compilation had succeeded, handing back a silently-corrupted model. The
+exact same construct declared directly in =inter-classes= (the genuinely
+inter-level scope) always worked correctly -- association classes there
+are unaffected by anything in this issue.
+
+*** Root cause (as found)
+
+- =MultiModelFactory.createClass()= / =createAssociation()= build the
+  multi-level-aware =MInternalClassImpl= / =MInternalAssociationImpl= types,
+  but =createAssociationClass()= just delegated to the base
+  =ModelFactory=, producing a plain =MAssociationClassImpl= -- the one
+  factory method not updated to match its siblings.
+- =MMultiLevelModel.addModel()= did
+  =model.classes().forEach(cls -> ((MInternalClassImpl)cls).setMainModel(this))=
+  -- an unconditional cast, no =instanceof= guard, so it threw the moment
+  a model contained an association class.
+- =MMultiLevelModel='s "steal all the fields from the multiModel"
+  constructor wrapped everything in one
+  =catch (Exception e) { System.out.println(e.getMessage()); }= --
+  completely silent, no error count increment, no real error-channel
+  report. Whatever fields hadn't been copied yet when this fired were
+  silently dropped, and the half-built model was still handed back as if
+  nothing had gone wrong.
+
+*** Fix implemented
+
+- =MMultiLevelModel.addModel()= now checks every class in the incoming
+  model with =instanceof MInternalClassImpl= *before* the cast, and
+  throws a clear, specific =Exception= naming the offending class and
+  model if the check fails, pointing the user at =inter-classes= or at
+  reifying the link as a plain class instead.
+- The constructor's silent =catch= now rethrows as an unchecked
+  =IllegalStateException= instead of printing and continuing. This
+  required no signature changes anywhere in the call chain:
+  =ASTMultiLevelModel.gen()= already wrapped its call into this
+  constructor (via =MultiLevelModelFactory.createMLM(...)=) in a
+  =try { ... } catch (Exception e) { mlmContext.reportError(fName, e); return null; }=
+  that wasn't previously being exercised for this failure at all (a
+  runtime exception is still an =Exception=), so the existing, correct
+  error-reporting path now handles it for free.
+- Net effect: the construct is now rejected with a clean, single-cause
+  compile error instead of crashing or silently succeeding. Real
+  multi-level support for association classes was *not* added -- see
+  "Considered and rejected" below for why not.
+
+*** Regression coverage added
+
+- =use-core/src/test/resources/org/tzi/use/mlmParser/associationclass_in_model_block_fail.use=
+  + matching =.fail= -- the per-model case now fails cleanly with the new
+  message (two lines: the specific cause, then the pre-existing generic
+  "error parsing multi level model" line that
+  =ASTMultiLevelModel.gen()= already appends whenever the per-model
+  generation phase reports any error -- this is pre-existing,
+  checked-in-elsewhere behavior, not something introduced by this fix;
+  see the comment at that throw site).
+- =use-core/src/test/resources/org/tzi/use/mlmParser/associationclass_in_inter_classes.use=
+  -- the =inter-classes= placement of the same construct still compiles
+  cleanly (positive control, no =.fail= file).
+- =USECompilerMLMComplexTest='s (renamed from =USECompilerMLMTestComplex=,
+  2026-08-28, so Surefire's default naming-pattern discovery actually
+  picks it up -- see Issue 3) expected file count bumped 48 -> 50.
+- Full =use-core= test suite (347 tests) and all 29 files in =examples/=
+  re-verified green after the fix.
+
+*** Considered and rejected: real multi-level support for association classes
+
+An association class is simultaneously a class (participates in the
+clabject graph, child/parent : =MClass=) and an association (participates
+in the assoclink graph, child/parent : =MAssociation=) --
+=MMediator= keeps these as two entirely separate maps
+(=fClabjects= / =fAssocLinks=), and the well-definedness checker builds a
+witness for each kind separately (=createObject=for a clabject,
+=createLink= for an assoclink) with no third primitive for "an object
+that is also a link between two other objects." Making a per-model
+association class properly multi-level-aware would mean inventing a new
+edge type that is both at once, plus the consistency rules between its
+class-refinement and association-refinement facets on the same
+declaration -- semantics nobody (including the MLM paper's own authors)
+has committed to. That's a research question, not a bug fix, so it was
+deliberately left out of scope; the clean rejection above is the
+intended, final behavior for this case, not a placeholder.
+
+*** Note on the examples directory
+
+=examples/= is reserved for constructs that work, by policy (2026-08-28)
+-- it carries no illustration of the per-model case this issue was about,
+fixed or not. =examples/MLM-USE/202608282106-InterAssociationClassBridge.use= still
+demonstrates the always-working =inter-classes= placement, since that's
+a genuine working feature, not a workaround for anything.
+
+** Issue 3: two MLM test classes never ran under =mvn test= or CI [FIXED 2026-08-28]
+
+*** Summary
+
+While answering "how many tests were added" for this whole engagement,
+diffing test counts before/after turned up a real gap: a plain
+=mvn test= (and CI's =mvn --batch-mode --update-snapshots verify= in
+=.github/workflows/maven.yml=) went from 290 to 347 tests, not 290 to
+349+ as the source-level count of new test methods implied.
+=USECompilerMLMSimple= (26 tests) and =USECompilerMLMTestComplex= (29
+tests, including Issue 1's own regression fixtures) were missing
+entirely from *both* the before and after run -- not a regression from
+this session's work, a pre-existing gap.
+
+*** Root cause
+
+This repo's Surefire version (2.12.4) only auto-discovers test classes
+whose name starts with =Test= or ends with =Test=/=TestCase= (the
+plural =*Tests.java= pattern that later Surefire versions also default
+to isn't in effect here -- confirmed empirically: =AllTests.java=, an
+old JUnit3 suite aggregator that explicitly lists both classes, doesn't
+run under a plain =mvn test= either, despite ending in "Tests"). Neither
+=USECompilerMLMSimple= (ends in "Simple") nor
+=USECompilerMLMTestComplex= (ends in "Complex") matches any of
+Surefire's default include patterns, so neither was ever run by a plain
+=mvn test= or by CI's =mvn verify= -- only by an explicit
+=-Dtest=ClassName= selection, which is how every check against them in
+this engagement was actually run.
+
+*** Fix implemented
+
+Renamed both files (via =git mv=, preserving history) so their names
+match Surefire's default patterns:
+- =USECompilerMLMSimple.java= -> =USECompilerMLMSimpleTest.java=
+  (class renamed to match)
+- =USECompilerMLMTestComplex.java= -> =USECompilerMLMComplexTest.java=
+  (class renamed to match)
+
+Updated the two references to the old names: =AllTests.java='s
+=addTestSuite(...)= calls, and Issue 1's section above.
+
+*** Verification
+
+Full =use-core= suite via a plain =mvn test= (no =-Dtest= filter, i.e.
+exactly what CI runs): before this fix, 347 tests (the two renamed
+classes' 55 tests silently absent); after, =402= tests, all passing --
+confirming both classes are now genuinely collected and exercised by
+the same command CI uses.
+
+** Issue 4: many associations attached to a deep generalization chain compiled drastically slower than either factor alone [FIXED 2026-08-28]
+
+*** Summary
+
+Found while building =examples/MLM-USE/202608282252-Monster100.use=, a
+deliberate 100-level generalization-depth stress test. A 109-class chain
+(100-class spine + 9 diamond-support classes) compiled in ~0.5s with no
+associations attached at all. Attaching one ordinary association to
+EVERY spine class (100 associations total, spread across all 100
+depths) pushed that to ~19s. Attaching two per class (200 associations)
+did not finish within 30s. The identical class-and-association COUNT
+(900 classes, 900 associations) arranged as flat, non-inheriting
+siblings instead of a deep chain compiled in ~1s. So it was specifically
+the combination of "many associations" and "attached to classes in a
+deep inheritance chain" that was slow -- neither alone reproduced it at
+this scale.
+
+*** Root cause (confirmed by reading the code, then fixing it)
+
+Two independent, compounding sources, both in the same family: a
+recursive closure/inheritance computation with no memoization, redone
+from scratch on every single call, invoked once per subclass every time
+an attribute or association-end role is added anywhere in the model (to
+check for name conflicts against every subclass -- see
+=MClassImpl.addAttribute()= and =MModel='s association-end conflict
+check, "tests if the rolenames are already used in one of the
+subclasses").
+
+1. =DirectedGraphBase.sourceNodeClosureSet(Class<T>, T)= -- the method
+   behind =MClassImpl.allChildren()= -- had *no* cache at all, doing a
+   full fresh DFS over the entire descendant subtree on every call. Its
+   mirror image, =targetNodeClosureSet(Class<T>, T)= (behind
+   =allParents()=), already used an existing Guava =LoadingCache=
+   (=closureCache=) -- =allChildren()= was simply never given the
+   equivalent =sourceClosureCache=, an asymmetry between two methods
+   that otherwise looked identical.
+2. =MClassImpl.navigableEnds()= rebuilt its full ancestor-chain closure
+   (a =TreeMap= merged recursively through every direct parent's own
+   =navigableEnds()=) from scratch, uncached, on every single call --
+   called once per subclass found by (1) above, so the two compounded.
+
+Confirmed both were the cause by fixing them and re-measuring against
+the exact same reproducers, on the exact same machine, via
+=git stash= (built from the pre-fix source, measured, restored the fix,
+measured again) rather than trusting numbers gathered under possibly-
+different conditions earlier:
+
+| Shape | Associations | Before | After | Speedup |
+|---+---+---+---+---|
+| Deep spine alone | 0 | ~0.45s (avg of 4) | ~0.48s (avg of 3) | ~1x (expected no-op) |
+| + spine associations | 100 | ~18.7s (avg of 3) | ~0.60s (avg of 3) | ~31x |
+| + spine associations | 200 | did not finish in 30s | ~0.85s (avg of 3) | >60x (lower bound) |
+| Full =Monster100.use= | 900 | did not finish in 120s [elsewhere: >90s] | ~2.44s (avg of 3) | >49x (lower bound) |
+
+The two censored ("did not finish") rows are lower bounds only -- those
+runs were killed by a timeout, not measured to completion, so the true
+pre-fix time (and true speedup) is unknown and could be far larger.
+Growth before the fix looked at least quadratic (0 -> 100 -> 200
+associations: 0.45s -> 18.7s -> unfinished-in-30s); after the fix,
+growth from 0 to 900 associations (0.48s -> 2.44s) looks roughly linear.
+
+*** Fix implemented
+
+- Added =sourceClosureCache=, a second =LoadingCache<N, Set<N>>= in
+  =DirectedGraphBase= mirroring the existing =closureCache= exactly,
+  backing =sourceNodeClosureSet()=. Reused the graph's existing, already-
+  correct invalidation: =clearCache()= (called on every node/edge
+  add/remove) now invalidates both caches, so this required no new
+  invalidation logic, only reusing what was already proven correct for
+  =closureCache=.
+- Added =fNavigableEndsCache=, a per-instance memoized field on
+  =MClassImpl=, populated the first time =navigableEnds()= is called and
+  returned directly on subsequent calls. Invalidated in
+  =registerNavigableEnds()= -- on the class registering the new end, and
+  (using the now-cheap =allChildren()= from the fix above) on every one
+  of its descendants, so a registration on an ancestor can never leave a
+  descendant holding a stale cached result, regardless of the order
+  associations happen to be declared in.
+- Fixing =navigableEnds()= to return a cached, shared map surfaced one
+  real caller that had been relying on the old "always a fresh copy"
+  behavior: =MAssociationClassImpl.navigableEnds()= mutated the map
+  =fClassImpl.navigableEnds()= handed back (=nav.put(...)=) in place --
+  harmless when every call produced a brand-new =TreeMap=, but would
+  have silently corrupted the shared cached map for every other caller
+  once caching was added. Fixed by having it copy before mutating.
+- Deliberately did *not* attempt a general incremental/dependency-
+  tracked cache -- both fixes are coarse "compute once, invalidate the
+  whole thing on any relevant change" memoization, not partial updates.
+  That's simple enough to be confident is correct, at the cost of not
+  saving partial recomputation when only one small thing changes.
+
+*** Verification
+
+Full =use-core= suite (=mvn test=, no filter): 402/402 passing after the
+fix, including =MAssociationClassTest= (exercises the exact class
+touched by the =navigableEnds()= mutation fix) and =GraphTest=
+(exercises =DirectedGraphBase= directly) -- both relevant regression
+areas, both green. =Monster100.use= itself re-verified correct (not just
+fast) at every sampled depth via the same two independent tools used
+before the fix (direct model introspection and
+=FlatUseTextRenderer=), which still agree exactly.
+
+Only reproduced with plain SAME-LEVEL generalization depth
+(=class Ck < Ck-1=), not a deep =clabject= chain specifically --
+=MInternalClassImpl extends MClassImpl=, so a genuinely deep multi-level
+model with rich per-level associations would go through the same fixed
+code paths, but that specific shape wasn't separately measured.
+
+** Issue 5: =FlatUseTextRenderer= never printed inter-enums or per-level enums at all [FIXED 2026-08-29]
+
+*** Summary
+
+Found while checking whether =FlatUseTextRenderer='s flattened output
+actually recompiles as self-contained plain USE (it hadn't been checked
+before, only informally inspected). Any class with an attribute typed by
+an =inter-enums= enum -- =examples/MLM-USE/202608282106-EnumViaInterEnum.use=
+and =202608282126-C20.use= -- failed to recompile with
+=Expected type name, found `Status'.=: the enum type itself was never
+declared anywhere in the flattened text. The same gap existed for a
+per-level enum (declared inside an ordinary =model ... end= block), just
+not yet exercised by any example at the time.
+
+*** Root cause
+
+=FlatUseTextRenderer.render()= never iterated any enum-type accessor at
+all -- not =mlm.enumTypes()= (the multi-level model's own table, which
+holds exactly the inter-enums, added by =MMultiLevelModel='s "steal
+fields" constructor -- see =ASTMultiModel.gen()= vs. =ASTModel.gen()= for
+where inter- vs. per-level enums are registered) and not any per-level
+=model.enumTypes()=. Every class declaration referencing an enum type was
+printed correctly; the enum's own =enum Name {...}= declaration was
+simply missing from the output entirely.
+
+*** Fix implemented
+
+=render()= now collects =mlm.enumTypes()= (inter-enums) and every
+=level.enumTypes()= (per-level enums) into one name-deduplicated map and
+prints each as an =enum Name {Lit1, Lit2, ...}= declaration before the
+classes. Enum names need no "Level@Class"-style disambiguation
+(=flatten=/=shortNameCounts=): unlike class names, they're already flat,
+global identifiers in this system (confirmed against
+=EnumViaInterEnum.use=, which declares =Status= with no level
+qualification anywhere).
+
+*** Verification
+
+=EnumViaInterEnum.use= and =C20.use= (the only two examples using =enum=
+at all, at time of writing) recompile cleanly after the fix. Full
+=use-core= suite re-verified green after all three of Issues 5-7 (see
+Issue 7's Verification for the final count).
+
+** Issue 6: an inter-level =associationclass= was printed twice -- once as a class, once as an association [FIXED 2026-08-29]
+
+*** Summary
+
+=examples/MLM-USE/202608282106-InterAssociationClassBridge.use= (an
+inter-level =associationclass Membership between ...=) failed to
+recompile with =In association `Membership': Model already contains a
+class `Membership'.=, immediately after Issue 5's fix started printing
+=mlm.interClasses()= for the first time (needed so an inter-association
+referencing an inter-class had somewhere to point) -- fixing one gap
+exposed this second, previously-masked one.
+
+*** Root cause
+
+=MAssociationClassImpl= implements both =MClass= and =MAssociation= at
+once, and an inter-level associationclass is registered in the
+multi-model's =fClasses= *and* =fAssociations= maps simultaneously, so it
+comes back from *both* =mlm.interClasses()= and =mlm.interAssociations()=.
+=render()='s generic per-class loop (=printClass=) and generic
+per-association loop (=printAssociation=) each printed it independently,
+under the same name, in two structurally different and mutually
+conflicting forms (=class Membership ... end= and
+=association Membership between ... end=), with no code anywhere aware
+that the two loops could hand back the same underlying object.
+
+Per-model associationclasses can't currently trigger this (Issue 1
+rejects them at compile time before this code ever runs), so the bug
+was only reachable through the =inter-classes= path.
+
+*** Fix implemented
+
+Added a dedicated =printAssociationClass()= that prints one class
+simultaneously an =MClass= and an =MAssociation= as a single
+=associationclass Name between ... attributes ... end= block (ends,
+then attributes; its invariants are still picked up separately by the
+existing per-class invariant-collection pass, so nothing extra was
+needed there). The generic class-printing loop now dispatches to it
+instead of =printClass()= whenever =cls instanceof MAssociationClass=,
+and both the per-level and inter-level association-printing loops skip
+any =MAssociation= that's also an =MAssociationClass= (since it's
+printed exactly once, via the class-side dispatch, instead).
+
+*** Verification
+
+=InterAssociationClassBridge.use= recompiles cleanly after the fix, with
+=Membership= appearing exactly once (as an =associationclass=). Full
+=use-core= suite re-verified green after all three of Issues 5-7 (see
+Issue 7's Verification for the final count).
+
+** Issue 7: a self-association restated with retyped ends could leave an invariant with a now-mismatched, frozen iterator-variable type [FIXED 2026-08-29]
+
+*** Summary
+
+=examples/MLM-USE/202608282106-GraphColoring.use= failed to recompile
+with =Invalid type `Vertex' for source element type `ColoredVertex'
+specified.=. =ColoredVertex= inherits =Vertex='s self-association
+=AdjacentTo= through a clabject edge that renames an unrelated attribute
+(=degree -> valence=), so it's ineligible for plain =<= (see
+=safePassThroughParents=) and gets the association restated with both
+ends retyped to =ColoredVertex= instead (=printAssociationRetyped=, the
+only way to make it reachable at all in flattened, inheritance-free
+output). But =ProperColoring='s already-compiled OCL body --
+=self.neighbors->forAll(n | ...)= -- was type-checked back when
+=neighbors= still meant =Set(Vertex)=, and =ExpressionPrintVisitor=
+always re-prints a query iterator variable's *original* inferred type
+(=n:Vertex=) whether or not the source ever wrote it explicitly. Once the
+association was retyped, that frozen annotation no longer matched the
+=Set(ColoredVertex)= the flattened text actually produces, and plain USE
+rejects a mismatched iterator-variable type outright.
+
+*** Root cause
+
+Two facts in tension, not a simple typo:
+
+- =printAssociationRetyped= *must* retype a restated self-association's
+  ends to the inheriting class -- there is no "&lt;" relation to the
+  original declaring class in flattened output for it to use instead
+  (see Issue 1-adjacent design note in =FlatUseTextRenderer='s own
+  class-level doc comment).
+- =ExpressionPrintVisitor.visitVarDecl()= unconditionally prints a query
+  iterator variable's type, even though USE's own grammar
+  (=elemVarsDeclaration='s =(COLON type)?=) makes that annotation
+  optional everywhere it can appear -- only an =iterate='s *accumulator*
+  variable (=variableInitialization=) is genuinely mandatory. Printing
+  the association's *original* declared element type once retyping has
+  changed what the collection actually ranges over describes a type
+  that no longer exists in the flattened model at all.
+
+*** Fix implemented
+
+A new =RetypingSafeExpressionPrintVisitor= (private, nested inside
+=FlatUseTextRenderer=, used only for this renderer's own invariant
+printing) overrides every query-expression visit method (=forAll=,
+=exists=, =select=, =reject=, =collect=, =collectNested=, =isUnique=,
+=sortedBy=, =one=, =any=, =closure=, the generic =query=, and =iterate=)
+to omit the iterator variable's type annotation -- always safe, since
+it's always optional and always re-inferable from whatever the
+(possibly retyped) collection actually is in the flattened text.
+=iterate='s accumulator variable is left fully typed, since that one
+really is mandatory. Suppression is scoped tightly around printing just
+the iterator declaration(s) of the query expression currently being
+visited, restored before the accumulator (if any) and the body are
+printed, so it can never leak into a nested query expression's own,
+independently-suppressed iterator variable.
+
+*** Verification
+
+=GraphColoring.use= recompiles cleanly after the fix. Full =use-core=
+suite: =404/404= passing (one stale =FlatUseTextRendererTest= assertion
+-- written against a case a prior =safePassThroughParents= improvement
+had already made obsolete, since that role became genuinely reachable
+via plain "&lt;" instead of needing this comment at all -- was updated to
+match, and a new test was added to keep real coverage of the
+genuinely-still-unrestated case it used to cover). All 31
+=examples/MLM-USE/*.use= and all 15 =examples/CatMLM/*.use= (using
+=USECompilerCatUSE=, not =USECompilerMLM=) now flatten and recompile
+cleanly -- =46/46=, up from 27/31 (MLM-USE only) before Issues 5-7.
+
+Separately, =FlatUseSystemFactory= (new: flattens + recompiles + wraps
+in a fresh =MSystem=) was added and proven, via
+=FlatUseSystemFactoryTest=, to make the ASSL snapshot generator
+(=GGenerator=, architecturally blind to multi-level constructs on its
+own) run correctly end-to-end against a real multi-level model for the
+first time. See the manual's new chapter "The Flattening Bridge"
+(=new-documentation/chapters/part3-mlm-use/17-the-flattening-bridge.org=)
+for the full writeup, including what's deliberately not wired up yet
+(the interactive Shell's =gen startprocedure= command, and the bundled
+Kodkod-based model finder plugin).
+
+** Addendum: CatMLM level-order / instanceOf name duplication (2026-08-28)
+:PROPERTIES:
+:CUSTOM_ID: addendum-catmlm-level-order
+:END:
 
 While discussing Issue 1's fix, a related question came up: does CatMLM's
 =instanceOf= (=:=, a clabject's powerclass reference) need a
@@ -219,52 +632,3 @@ added (=CatMLMLevelNameDuplicationTest.java=) locks in that reusing a
 class name at every level of a 3-level CatMLM chain, including a
 same-level subclass sharing the name too, still resolves every
 =instanceOf= edge to exactly its own declared parent.
-
-* Issue 3: two MLM test classes never ran under =mvn test= or CI [FIXED 2026-08-28]
-
-** Summary
-
-While answering "how many tests were added" for this whole engagement,
-diffing test counts before/after turned up a real gap: a plain
-=mvn test= (and CI's =mvn --batch-mode --update-snapshots verify= in
-=.github/workflows/maven.yml=) went from 290 to 347 tests, not 290 to
-349+ as the source-level count of new test methods implied.
-=USECompilerMLMSimple= (26 tests) and =USECompilerMLMTestComplex= (29
-tests, including this file's own Issue 1 regression fixtures) were
-missing entirely from *both* the before and after run -- not a
-regression from this session's work, a pre-existing gap.
-
-** Root cause
-
-This repo's Surefire version (2.12.4) only auto-discovers test classes
-whose name starts with =Test= or ends with =Test=/=TestCase= (the
-plural =*Tests.java= pattern that later Surefire versions also default
-to isn't in effect here -- confirmed empirically: =AllTests.java=, an
-old JUnit3 suite aggregator that explicitly lists both classes, doesn't
-run under a plain =mvn test= either, despite ending in "Tests"). Neither
-=USECompilerMLMSimple= (ends in "Simple") nor
-=USECompilerMLMTestComplex= (ends in "Complex") matches any of
-Surefire's default include patterns, so neither was ever run by a plain
-=mvn test= or by CI's =mvn verify= -- only by an explicit
-=-Dtest=ClassName= selection, which is how every check against them in
-this engagement was actually run.
-
-** Fix implemented
-
-Renamed both files (via =git mv=, preserving history) so their names
-match Surefire's default patterns:
-- =USECompilerMLMSimple.java= -> =USECompilerMLMSimpleTest.java=
-  (class renamed to match)
-- =USECompilerMLMTestComplex.java= -> =USECompilerMLMComplexTest.java=
-  (class renamed to match)
-
-Updated the two references to the old names: =AllTests.java='s
-=addTestSuite(...)= calls, and this file's Issue 1 section.
-
-** Verification
-
-Full =use-core= suite via a plain =mvn test= (no =-Dtest= filter, i.e.
-exactly what CI runs): before this fix, 347 tests (the two renamed
-classes' 55 tests silently absent); after, =402= tests, all passing --
-confirming both classes are now genuinely collected and exercised by
-the same command CI uses.

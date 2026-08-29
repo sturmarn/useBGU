@@ -1,4 +1,4 @@
-% Created 2026-08-26 Wed 09:48
+% Created 2026-08-29 Sat 03:04
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt,twoside,a4paper]{book}
 \usepackage[utf8]{inputenc}
@@ -124,9 +124,9 @@ language=MLMUSE%
 \mainmatter
 
 \part{Getting Started}
-\label{sec:org3abc47a}
+\label{sec:org8779709}
 \chapter{Introduction}
-\label{sec:orgcb60dbc}
+\label{sec:orgc29df65}
 This manual documents a research fork of USE that adds \textbf{multi-level
 modeling} (MLM-USE) and a terser front-end syntax for it (CatUSE, also
 called CatMLM). It is written for someone who wants to actually write,
@@ -134,7 +134,7 @@ check, and reason about models in this system --- not just read about
 the theory behind it.
 
 \section{What Is USE?}
-\label{sec:org3d2738d}
+\label{sec:orgb19dbad}
 \index{USE}
 
 USE (the ``UML-based Specification Environment'') is a tool for
@@ -148,11 +148,11 @@ Originally developed at the University of Bremen, it is both a
 teaching tool for UML/OCL and a research platform -- this fork is an
 example of the latter.
 
-Everything in Part \ref{sec:org2c3ff8a} describes plain USE as it stands
+Everything in Part \ref{sec:org9ef9f58} describes plain USE as it stands
 in this fork today, independent of anything multi-level.
 
 \section{Three Layers: USE, MLM-USE, CatUSE}
-\label{sec:org831f152}
+\label{sec:orgd5a3a70}
 \index{MLM-USE}
 \index{CatUSE!relationship to MLM-USE}
 
@@ -171,7 +171,7 @@ CatUSE & Terser syntax that desugars into MLM-USE's AST & \texttt{category}\\[0p
 \end{tabular}
 \end{center}
 
-\textbf{MLM-USE} (Part \ref{sec:orga1bec65}) is where multi-level modeling
+\textbf{MLM-USE} (Part \ref{sec:org6a6c176}) is where multi-level modeling
 actually lives: a class can simultaneously be an ordinary class \textbf{and}
 an instance of another class one level up (a \emph{clabject}), letting a
 single model describe several ontological levels -- for example, a
@@ -179,7 +179,7 @@ product catalog level whose classes are themselves instances of a
 ``kind of product'' level -- without collapsing them into one flat
 model or duplicating information across separate models.
 
-\textbf{CatUSE} (Part \ref{sec:orge58ddb4}, also called CatMLM in the source) is a
+\textbf{CatUSE} (Part \ref{sec:org29a1bf3}, also called CatMLM in the source) is a
 front-end grammar layered on top of MLM-USE. It does not add any new
 semantics of its own: a CatUSE specification is parsed and then
 desugared into exactly the same abstract syntax tree that an
@@ -205,7 +205,7 @@ clabject Car : Product end
 \end{lstlisting}
 
 CatUSE currently covers less ground than MLM-USE -- some things (see
-Chapter \ref{sec:org63541d4}) can only be written in full
+Chapter \ref{sec:org671565c}) can only be written in full
 MLM-USE. Which one to reach for is mostly a matter of how much of a
 model is genuinely multi-level: CatUSE reads better when most classes
 in a level participate in cross-level instantiation; plain MLM-USE
@@ -213,7 +213,7 @@ keeps more control when only a few do, or when a construct CatUSE
 cannot express is needed.
 
 \section{Terminology at a Glance}
-\label{sec:orgeb539b8}
+\label{sec:org80f9f29}
 A handful of terms recur throughout this manual. This is only a
 pointer to where each is properly introduced, not a substitute for
 reading that section.
@@ -226,50 +226,50 @@ reading that section.
 \begin{description}
 \item[{\textbf{Model}}] A named collection of classes, associations, and
 constraints -- the unit USE compiles and checks. See Chapter
-\ref{sec:org145cbce}.
+\ref{sec:org6ab86a8}.
 \item[{\textbf{Level}}] One ``floor'' of a multi-level model. See Chapter
-\ref{sec:orga4c021d}.
+\ref{sec:orgde23e19}.
 \item[{\textbf{Clabject}}] A class that is also, simultaneously, an instance of a
 class at a higher level. The name blends ``class'' and ``object''. See
-Chapter \ref{sec:orga4c021d}.
+Chapter \ref{sec:orgde23e19}.
 \item[{\textbf{Powerclass}}] The higher-level class a clabject is an instance of.
-See Chapter \ref{sec:orga4c021d}.
+See Chapter \ref{sec:orgde23e19}.
 \item[{\textbf{Mediator}}] A declaration that relates classes across two adjacent
-levels. See Chapter \ref{sec:orga4c021d}.
+levels. See Chapter \ref{sec:orgde23e19}.
 \item[{\textbf{Category}}] CatUSE's keyword for a classifier declaration that may
 also carry cross-level instantiation directly on its own header. See
-Chapter \ref{sec:org06db68c}.
+Chapter \ref{sec:org189b488}.
 \end{description}
 
 \section{How to Read This Manual}
-\label{sec:org5fa921c}
-Part \ref{sec:org3abc47a} gets the system installed, built, and
+\label{sec:org40a8231}
+Part \ref{sec:org8779709} gets the system installed, built, and
 running, and ends with a short guided walkthrough (Chapter
-\ref{sec:orgd9cc398}). Part \ref{sec:org2c3ff8a} documents plain
-USE in full. Parts \ref{sec:orga1bec65} and \ref{sec:orge58ddb4} cover MLM-USE
+\ref{sec:orgadeff9a}). Part \ref{sec:org9ef9f58} documents plain
+USE in full. Parts \ref{sec:org6a6c176} and \ref{sec:org29a1bf3} cover MLM-USE
 and CatUSE respectively, each in the same shape: concepts, syntax,
-worked examples. Part \ref{sec:org745982f} is for anyone modifying this
+worked examples. Part \ref{sec:org24bb1c9} is for anyone modifying this
 fork's own implementation, not just writing models in it. Part
-\ref{sec:orgc5ae712} covers where USE and this fork came from. The
+\ref{sec:orgec8e296} covers where USE and this fork came from. The
 appendices are lookup references (grammars, keywords, shell commands),
 not narrative -- go there when you need to check a detail, not to read
 start to end.
 
 Code listings are syntax-highlighted: hard (fully reserved) keywords
 in one color, soft (contextual) keywords in another -- see Chapter
-\ref{sec:org46d74f9} for what that distinction means and why it
+\ref{sec:orgfa8ba54} for what that distinction means and why it
 matters. Boxed notes call out things worth pausing on:
 
 \begin{manualnote}
 This manual assumes no prior familiarity with USE. If you already know
 plain USE and only want the multi-level material, Part
-\ref{sec:org3abc47a} can be skimmed and Part \ref{sec:org2c3ff8a}
+\ref{sec:org8779709} can be skimmed and Part \ref{sec:org9ef9f58}
 skipped entirely.
 \end{manualnote}
 \chapter{Installing and Building}
-\label{sec:orgf97e73e}
+\label{sec:org73dfb48}
 \section{Prerequisites}
-\label{sec:org3029462}
+\label{sec:orgdc154d7}
 \index{JDK}
 \index{Maven}
 
@@ -287,7 +287,7 @@ Building this manual is a separate matter, covered by its own
 \texttt{Makefile} in \texttt{new-documentation/}, not by the project's Maven build.
 
 \section{Getting the Source}
-\label{sec:org155dd77}
+\label{sec:org0fb9f19}
 \begin{lstlisting}[language=ShellSession,label= ,caption= ,captionpos=b,numbers=none]
 git clone https://github.com/sturmarn/useBGU.git
 cd useBGU
@@ -298,7 +298,7 @@ All multi-level and CatUSE work described in this manual lives on the
 \texttt{MLM-USE} branch of this fork, not on upstream USE.
 
 \section{Module Layout}
-\label{sec:org7c8eff9}
+\label{sec:org1de4a7e}
 The build is a single Maven reactor with three modules:
 
 \begin{center}
@@ -311,11 +311,11 @@ Module & Contains\\[0pt]
 \end{tabular}
 \end{center}
 
-Chapters \ref{sec:org92b8b93} onward go into this layout in much more
+Chapters \ref{sec:orgc736412} onward go into this layout in much more
 detail; this chapter only covers enough to build and run the system.
 
 \section{Building with Maven}
-\label{sec:orgab5016f}
+\label{sec:org2671558}
 From the repository root:
 
 \begin{lstlisting}[language=ShellSession,label= ,caption= ,captionpos=b,numbers=none]
@@ -334,7 +334,7 @@ tests), use \texttt{mvn verify} instead -- this is what CI runs.
 \end{manualnote}
 
 \section{Build Artifacts}
-\label{sec:orgffd822d}
+\label{sec:org398e54b}
 After a successful build:
 
 \begin{itemize}
@@ -342,7 +342,7 @@ After a successful build:
 \item \texttt{use-gui/target/use-gui.jar} -- a single runnable jar with all
 dependencies bundled and a manifest \texttt{Main-Class} of
 \texttt{org.tzi.use.main.Main}. This is the jar Chapter
-\ref{sec:orgfe2e8a9} runs directly.
+\ref{sec:org6dc86d5} runs directly.
 \item \texttt{use-assembly/target/use-7.1.1.tar.gz} and \texttt{.zip} -- a full
 distributable archive: a \texttt{bin/} launcher script, \texttt{lib/use-gui.jar},
 bundled OCL extensions, plugin jars, and the example models shipped
@@ -353,9 +353,9 @@ The version number in the assembly's filename tracks the project's
 \texttt{pom.xml} version (\texttt{7.1.1} at the time of writing); it will differ if
 that version has moved on since.
 \chapter{Running the System}
-\label{sec:orgfe2e8a9}
+\label{sec:org6dc86d5}
 \section{Running the Assembled Distribution}
-\label{sec:org6b0e5f2}
+\label{sec:org939475c}
 Unpack \texttt{use-assembly/target/use-7.1.1.tar.gz} (or the \texttt{.zip}) and run
 its launcher script:
 
@@ -371,7 +371,7 @@ verbatim to that jar (\texttt{bin/use [options] [spec\_file] [cmd\_file]},
 covered below).
 
 \section{Running Directly with \texttt{java -jar}}
-\label{sec:org45ede65}
+\label{sec:org01d8df8}
 Without unpacking a distribution, the freshly built jar runs on its
 own:
 
@@ -383,7 +383,7 @@ This is the same jar \texttt{bin/use} wraps, so every option below behaves
 identically either way.
 
 \section{Double-Clicking the Jar}
-\label{sec:orgd2d97d8}
+\label{sec:org8db5eee}
 \texttt{use-gui.jar} carries a manifest \texttt{Main-Class}, so on a system where
 \texttt{.jar} files are associated with a Java launcher (typically the case
 on Windows and macOS out of the box; Linux desktop environments vary
@@ -394,7 +394,7 @@ options or a spec file to open on startup requires an actual
 command-line invocation; double-clicking cannot supply either.
 
 \section{Command-Line Options}
-\label{sec:org1be0851}
+\label{sec:org7f068e1}
 \index{command-line options}
 
 The full usage message (\texttt{java -jar use-gui.jar -h}):
@@ -439,11 +439,11 @@ headless), \texttt{-v} (see what's happening during a slow compile), \texttt{-q}
 scripting or CI), and \texttt{-h} / \texttt{-V}. The \texttt{diagnostics} group and
 \texttt{-disableCollectShorthand}, \texttt{-oclAnyCollectionsChecks}, and
 \texttt{-extendedTypeSystemChecks} are aimed more at people working on the
-compiler itself (Part \ref{sec:org745982f}) than at someone writing
+compiler itself (Part \ref{sec:org24bb1c9}) than at someone writing
 models.
 
 \section{The Shell Runs Underneath the GUI, Too}
-\label{sec:org7afd954}
+\label{sec:org0818ca1}
 \index{shell!relationship to the GUI}
 
 \texttt{-nogui} does not disable the interactive shell -- it only suppresses
@@ -453,11 +453,11 @@ the window. Looking at how startup actually proceeds: if a
 is started; the GUI window is created only if \texttt{-nogui} was not passed.
 The GUI is a window wrapped around the same underlying engine the
 shell drives -- not a separate mode. Chapter
-\ref{sec:org66d4965} covers the shell's own command
+\ref{sec:org245a2e0} covers the shell's own command
 language in full.
 
 \section{Opening a Specification: Four Entry Points}
-\label{sec:orgf62dfcf}
+\label{sec:orgaa6bef6}
 \index{opening a specification (GUI)}
 
 The GUI's File menu offers four distinct ``Open\ldots{}'' actions, and they
@@ -469,10 +469,10 @@ actually wrote.
 \begin{tabular}{lp{9cm}}
 Action & Parses\\[0pt]
 \hline
-Open specification\ldots{} & A plain, single \texttt{model} (Part \ref{sec:org2c3ff8a})\\[0pt]
+Open specification\ldots{} & A plain, single \texttt{model} (Part \ref{sec:org9ef9f58})\\[0pt]
 Open multi specification\ldots{} & Several ordinary models glued by \texttt{inter-*} sections, no levels\\[0pt]
-Open multi level specification\ldots{} & An \texttt{MLM} file: levels, clabjects, mediators (Part \ref{sec:orga1bec65})\\[0pt]
-Open CatUSE specification\ldots{} & A CatUSE/CatMLM file (Part \ref{sec:orge58ddb4})\\[0pt]
+Open multi level specification\ldots{} & An \texttt{MLM} file: levels, clabjects, mediators (Part \ref{sec:org6a6c176})\\[0pt]
+Open CatUSE specification\ldots{} & A CatUSE/CatMLM file (Part \ref{sec:org29a1bf3})\\[0pt]
 \end{tabular}
 \end{center}
 
@@ -482,7 +482,7 @@ keyword (\texttt{model}, \texttt{multi\_model}, \texttt{MLM}, or \texttt{categor
 the top level) tells you which one it is.
 
 \section{Loading a Specification from the Command Line}
-\label{sec:org1360463}
+\label{sec:org1483098}
 The command line has no separate ``which grammar'' switch -- \texttt{spec\_file}
 is compiled with the entry point matching what a \texttt{-nogui} batch run
 needs, inferred the same way as the table above from the file's own
@@ -497,111 +497,490 @@ process exits \texttt{1} if any constraint failed, \texttt{0} otherwise -- suita
 for a CI step that should fail the build on a broken model.
 
 \section{A Quick Sanity Check}
-\label{sec:org4b27450}
+\label{sec:org62e108a}
 To confirm the build actually works end to end, try opening one of the
 worked examples that ship in the repository's own \texttt{examples/}
-directory, e.g. \texttt{examples/USE/Vehicle.use}, with ``Open
-specification\ldots{}''. Chapter \ref{sec:orgd9cc398} walks through
+directory, e.g. \texttt{examples/USE/202608282106-Vehicle.use}, with ``Open
+specification\ldots{}''. Chapter \ref{sec:orgadeff9a} walks through
 a small model like this one in full, from writing it to checking its
 first invariant.
 \chapter{A Quickstart Tutorial}
-\label{sec:orgd9cc398}
+\label{sec:orgadeff9a}
 This chapter is a placeholder.
 \part{Modeling in Plain USE}
-\label{sec:org2c3ff8a}
+\label{sec:org9ef9f58}
 \chapter{Class Diagrams}
-\label{sec:org145cbce}
+\label{sec:org6ab86a8}
 This chapter is a placeholder.
 \chapter{OCL Constraints}
-\label{sec:org68ceb0a}
+\label{sec:org0cf4a3c}
 This chapter is a placeholder.
 \chapter{The OCL Standard Library}
-\label{sec:org2d77302}
+\label{sec:orgd84588d}
 This chapter is a placeholder.
 \chapter{System States and the Shell}
-\label{sec:org66d4965}
+\label{sec:org245a2e0}
 This chapter is a placeholder.
 \chapter{Validating Specifications}
-\label{sec:orgf947642}
+\label{sec:org6928126}
 This chapter is a placeholder.
 \chapter{The Graphical User Interface}
-\label{sec:org549683a}
+\label{sec:org1b0f916}
 This chapter is a placeholder.
 \chapter{Model Unit Tests}
-\label{sec:org82d72ae}
+\label{sec:org4f8ed77}
 This chapter is a placeholder.
 \part{Multi-Level Modeling with MLM-USE}
-\label{sec:orga1bec65}
+\label{sec:org6a6c176}
 \chapter{Concepts}
-\label{sec:orga4c021d}
+\label{sec:orgde23e19}
 This chapter is a placeholder.
 \chapter{MLM-USE Syntax in Detail}
-\label{sec:org56cf687}
+\label{sec:orgec4571f}
 This chapter is a placeholder.
 \chapter{Multi-Level Shell Commands}
-\label{sec:org8c526d9}
+\label{sec:org38c2e81}
 This chapter is a placeholder.
 \chapter{Worked Examples}
-\label{sec:org0a95039}
+\label{sec:org2f12cb5}
 This chapter is a placeholder.
+\chapter{Validating Multi-Level Models}
+\label{sec:org3fbf6cb}
+\index{validation!multi-level models}
+
+This chapter is an early draft: the underlying design question --- how
+\textbf{should} a multi-level model be validated, and how much of that can
+reasonably be retrofitted onto tools that were never built with levels
+in mind --- is still open. What follows is accurate as of this
+writing, but expect it to be revised as that design settles.
+
+Chapter \ref{sec:org6928126} covers validation for plain
+USE. Everything there --- structural checking, invariant evaluation,
+snapshot generation, bounded model finding --- exists as a real,
+usable tool. This chapter is about what happens to each of those tools
+once levels, clabjects, and inter-level constructs enter the picture.
+
+\section{What ``Validating a Model'' Means in USE}
+\label{sec:org0ba3e68}
+USE actually ships several distinct things under the umbrella of
+``validation,'' and it matters which one is meant:
+
+\begin{itemize}
+\item \textbf{Structural checking} --- does the model itself parse and
+type-check (multiplicities, navigability, redefinition rules, and so
+on)? This is what the compiler already does; nothing here is
+specific to runtime state at all.
+\item \textbf{Invariant evaluation against a system state} --- given a concrete,
+already-populated set of objects and links, does every invariant
+hold? This is ordinary OCL evaluation, nothing more.
+\item \textbf{Snapshot generation} (ASSL, the \texttt{generate} shell commands) ---
+backtracking search that actually \textbf{builds} a concrete population of
+objects and links satisfying a set of constraints, guided by a
+user-written procedure (\texttt{Create}, \texttt{CreateN}, \texttt{Insert}, \texttt{Try}, \texttt{Any},
+\ldots{}). This is the closest thing USE has to ``show me a model of my
+constraints.''
+\item \textbf{Bounded model finding} --- a SAT/CSP-based search over a
+finite-size universe, bundled with this fork as a plugin (see
+\ref{sec:org668373d} in the next chapter). Conceptually similar to
+Alloy's Kodkod-based analyzer.
+\end{itemize}
+
+\begin{manualnote}
+\texttt{checkPartialSatisfiability()} / \texttt{checkWellDefinednessState()} --- the
+two methods behind well-definedness checking --- are \textbf{not} a solver.
+Each call constructs exactly one, arbitrary, concrete witness state
+(every attribute defaulted to \texttt{UndefinedValue}) and evaluates the
+invariant against \textbf{that single state}. It is not an existential search
+over all possible states, and a \texttt{false} result does not mean ``no
+witness exists'' --- only that this particular default-constructed one
+doesn't satisfy it. It is easy to over-read what this check actually
+proves; it proves less than ``satisfiable'' or ``unsatisfiable'' in the
+logical sense.
+\end{manualnote}
+
+\section{The Multi-Level Blind Spot}
+\label{sec:org18aabaf}
+\index{validation!architectural blind spot}
+
+None of the four tools above were designed with multi-level constructs
+in mind, and this is not a minor omission:
+
+\begin{itemize}
+\item A clabject's \textbf{cancellation} (a removed attribute, a renamed
+attribute, a removed role, a removed constraint --- see Chapter
+\ref{sec:orgde23e19}) is resolved on demand, in memory, by
+\texttt{MInternalClassImpl}'s own bookkeeping. A plain-USE-shaped tool that
+simply walks \texttt{MClass=/=MAssociation} navigation --- which is exactly
+what \texttt{MSystem} and the ASSL generator (\texttt{GGenerator}) do --- sees the
+\textbf{raw}, unflattened per-level class, cancellation and all still
+present.
+\item \textbf{Inter-classes}, \textbf{inter-associations}, and \textbf{inter-constraints} ---
+constructs owned by no single constituent model at all --- live only
+in the multi-level model's own bookkeeping
+(\texttt{MMultiModel.interClasses()=/=interAssociations()=/
+  =interConstraints()}). A tool scoped to one constituent \texttt{MModel} at a
+time never sees them.
+\end{itemize}
+
+Handed an \texttt{MMultiLevelModel} directly, \texttt{GGenerator} happily starts
+generating against the \textbf{raw} per-level classes --- not an error, not a
+warning, just silently wrong: cancelled attributes reappear, renamed
+ones keep their original name, and inter-level constraints are never
+checked at all because the generator never even looks at them. This
+was confirmed directly against this fork's own \texttt{GGenerator} and
+\texttt{MSystem} code, not assumed.
+
+The bundled bounded-model-finder plugin appears, from its bytecode, to
+have the identical scoping (per-\texttt{MModel}, not multi-level-aware) --- see
+\ref{sec:org668373d} for the caveats on that finding, since it was
+established by inspection rather than by actually running it against a
+multi-level model.
+
+\section{Two Different Ways to Think About the Problem}
+\label{sec:org420d4fa}
+There are two genuinely different research angles on ``validate a
+model with an unbounded, or merely very large, population of linked
+objects,'' worth keeping apart:
+
+\begin{enumerate}
+\item \textbf{Bounded, concrete techniques.} Snapshot generation and bounded
+model finding both work by actually constructing --- or searching
+over --- specific, finite object populations. They tell you
+something true about the instances they build, but they say
+nothing about instance counts beyond whatever bound was configured.
+This is what USE actually does today, multi-level or not.
+\item \textbf{Abstract, unbounded reasoning.} Shape analysis, and in particular
+parametric shape analysis via three-valued logic (TVLA)
+\cite{SagivRepsWilhelm:2002}, reasons about the shape of a linked
+data structure --- how many objects, of what class, connected how
+--- \textbf{without ever instantiating a specific population at all}. This
+is the right theoretical framing for a question like ``can this
+multi-level model's constraints ever be satisfied by \textbf{any} size of
+population,'' but nothing in this fork attempts it; it is mentioned
+here as a pointer for future work, not as a described feature.
+\end{enumerate}
+
+A related, purely theoretical point worth knowing when judging what's
+achievable here at all: OCL's own expressive power depends on which
+version is in play. OCL 1.4/1.5 expressions are Turing-complete;
+OCL 2.0 expressions, restricted to guarantee termination, are exactly
+the primitive recursive functions \cite{CengarleKnapp:2004}. This fork
+was confirmed (empirically, not merely by reading the grammar) to
+behave like the \textbf{unrestricted}, Turing-complete variant --- unbounded
+recursion runs until a genuine \texttt{StackOverflowError} (caught and
+re-thrown as a plain \texttt{RuntimeException}, not statically rejected). That
+matters here because it rules out any hope of a general, exhaustive,
+\textbf{static} verification procedure for arbitrary OCL constraints in this
+system, multi-level or not: the underlying constraint language is, by
+construction, too expressive for that. Whatever validation strategy
+this fork eventually settles on for multi-level models, it will --- like
+every other OCL tool of this kind --- be bounded, or heuristic, or
+both, not a decision procedure.
+
+\begin{manualwarning}
+This is an open design area, not a finished feature. The next chapter
+describes the one concrete step taken so far --- making the existing
+bounded tools (specifically, ASSL) usable against a multi-level model
+at all, by flattening it first --- and is explicit about what still
+isn't wired up.
+\end{manualwarning}
+\chapter{The Flattening Bridge}
+\label{sec:orgfee8363}
+\index{validation!flattening bridge}
+\index{FlatUseSystemFactory}
+
+This chapter describes the one concrete step taken so far on the open
+question raised in Chapter \ref{sec:org3fbf6cb}: making an existing
+bounded validation tool --- specifically, ASSL snapshot generation ---
+actually work correctly against a multi-level model, rather than
+silently generating against its raw, unflattened structure. It does
+not resolve the larger design question; it makes one tool usable while
+that question stays open, and it is explicit below about what still
+isn't done.
+
+\section{The Idea}
+\label{sec:orge254dcc}
+The fix isn't to make \texttt{GGenerator} multi-level-aware --- that would be
+a substantially larger undertaking than this fork's scope. It's to
+hand it something it already understands correctly: an ordinary,
+single-level \texttt{MModel}.
+
+Chapter \ref{sec:orga6105c5} describes
+\texttt{FlatUseTextRenderer} --- the tool that computes exactly this. Given a
+compiled \texttt{MMultiLevelModel}, it renders every class's fully resolved,
+post-cancellation structure (attributes, roles, invariants ---
+cancellations already applied) as ordinary plain-USE text, with every
+inter-class, inter-association, and inter-constraint folded in and no
+multi-level syntax left anywhere in the output. Recompiling that text
+with the ordinary \texttt{USECompiler} (not \texttt{USECompilerMLM}) yields a plain
+\texttt{MModel} that \texttt{GGenerator} was always designed for.
+
+The pipeline, end to end:
+
+\begin{lstlisting}[language=MLMUSE,label= ,caption= ,captionpos=b,numbers=none]
+compiled MMultiLevelModel
+        |  FlatUseTextRenderer.render(...)
+        v
+flattened plain-USE text (a "model ... end" block, no MLM syntax)
+        |  USECompiler.compileSpecification(...)
+        v
+plain MModel
+        |  new MSystem(...)
+        v
+MSystem  ---  system.generator().startProcedure(...) now just works
+\end{lstlisting}
+
+\section{\texttt{FlatUseSystemFactory}}
+\label{sec:org11d0f00}
+\texttt{org.tzi.use.tools.catuselatex.FlatUseSystemFactory} packages the last
+three steps of that pipeline as a single call:
+
+\begin{lstlisting}[language=MLMUSE,label= ,caption= ,captionpos=b,numbers=none]
+MSystem system = FlatUseSystemFactory.createFlattenedSystem(
+    mlm,            // an already-compiled MMultiLevelModel
+    "MyModelName",  // display name for the flattened "model" block
+    err             // PrintWriter for a recompilation failure, if any
+);
+if (system != null) {
+    system.generator().startProcedure(callString, args);
+}
+\end{lstlisting}
+
+A \texttt{null} return means the flattening itself produced text that failed
+to recompile --- a bug in \texttt{FlatUseTextRenderer}, not a problem with the
+input model (which already compiled successfully as a multi-level
+model to get this far at all).
+
+The returned \texttt{MSystem} is a \textbf{fresh, independent} system over the
+flattened model --- a different object from any \texttt{MSystem} the caller
+may already have wrapping the original \texttt{mlm}. Generation results
+(objects, links, invariant checks) live in the returned system, not in
+whichever system \texttt{mlm} itself came from. A caller juggling both needs
+to keep that distinction straight, exactly as with any two unrelated
+\texttt{MSystem} instances.
+
+\section{What's Verified}
+\label{sec:org660c0c1}
+\begin{itemize}
+\item Every worked example under \texttt{examples/MLM-USE/} and \texttt{examples/CatMLM/}
+--- including a 1000-plus-class stress-test model --- flattens and
+recompiles cleanly as plain USE.
+\item \texttt{FlatUseSystemFactoryTest} runs a real ASSL procedure end to end
+against a flattened multi-level model via
+\texttt{system.generator().startProcedure(...)}, and confirms the objects it
+creates actually land in the resulting system state. Nothing in this
+codebase exercised \texttt{startProcedure} against any model at all before
+this test existed.
+\end{itemize}
+
+\section{The Bundled Model-Finder Plugin}
+\label{sec:org668373d}
+\index{validation!bounded model finding}
+
+This fork ships a second bounded validation tool alongside ASSL:
+\texttt{use-assembly/src/main/resources/plugins/ModelValidatorPlugin-5.2.0-r1.jar},
+a real, bundled SAT/CSP-based model validator (built on \texttt{sat4j} and
+\texttt{choco-solver}, conceptually similar to Alloy's Kodkod-based analyzer),
+loaded into \texttt{use-gui} at startup via its \texttt{PluginRegistry}. It is a
+pre-built binary jar shipped as a packaging resource, not a Maven
+dependency of any module's own source --- worth knowing, since a plain
+source or POM grep for a solver dependency will not find it.
+
+From its bytecode, the plugin appears to be scoped the same way
+\texttt{GGenerator} is: per constituent \texttt{MModel}, with no visible awareness of
+clabjects, cancellation, or inter-level constructs. That finding rests
+on inspection, not execution --- unlike the ASSL generator (see
+\ref{sec:org660c0c1}), this plugin has not actually been run
+against a multi-level model, flattened or not, so its blind spot is
+inferred rather than empirically confirmed. Whether the flattening
+bridge above applies to it as directly as it did to ASSL --- the
+plugin has its own GUI-integrated invocation path, not a bare
+\texttt{MSystem} call --- is itself an open question.
+
+\section{What's Not Yet Wired Up}
+\label{sec:orge7bf090}
+\begin{manualwarning}
+Two things deliberately stop here, both because they raise design
+questions of their own rather than being simple wiring:
+
+\begin{itemize}
+\item \textbf{The interactive Shell.} \texttt{cmdGenStartProcedure} (the shell command
+behind \texttt{gen startprocedure}) still operates directly on
+\texttt{fSession.system()} --- whatever the user last \texttt{open}'d, multi-level
+or not --- with no flattening step at all. Swapping in a flattened
+system just for that one call raises an immediate follow-on question:
+which system do the \textbf{later} generation commands (\texttt{gen result},
+\texttt{gen invariant}, and friends) then operate on? The result lives in
+the flattened system, not the original one, so every one of those
+commands would need to know to keep using the flattened system
+instead of silently looking at the wrong (and un-generated-into)
+original. That's a real piece of session-state design, not yet
+attempted.
+\item \textbf{The bundled bounded model finder plugin} (see
+\ref{sec:org668373d}) has not been run through this same bridge at
+all. Its blind spot was established by bytecode inspection, not by
+actually exercising it against a multi-level model the way ASSL now
+has been.
+\end{itemize}
+\end{manualwarning}
 \part{CatUSE and CatMLM}
-\label{sec:orge58ddb4}
+\label{sec:org29a1bf3}
 \chapter{Motivation}
-\label{sec:orge6bfe96}
+\label{sec:org9b145e9}
 This chapter is a placeholder.
 \chapter{CatMLM Syntax in Detail}
-\label{sec:org06db68c}
+\label{sec:org189b488}
 This chapter is a placeholder.
 \chapter{Known Expressiveness Gaps}
-\label{sec:org63541d4}
-This chapter is a placeholder.
+\label{sec:org671565c}
+This chapter documents constructs that are deliberately unsupported, or
+supported only in a restricted form, in MLM-USE and CatMLM -- as opposed
+to bugs, which belong in the issue tracker, not here. Each entry says
+what's restricted, why, and what to write instead. The full empirical
+investigation behind each entry (reproducers, root causes in the Java
+source, considered alternatives) lives in \texttt{known-issues.org} at the repo
+root; this chapter gives the user-facing summary.
+
+\section{Association classes are per-model, not multi-level}
+\label{sec:org15db427}
+
+\subsection{The restriction}
+\label{sec:orge22e22d}
+
+An \texttt{associationclass} declared directly in \texttt{inter-classes} is a full
+citizen of a multi-level model. The same declaration inside an ordinary
+\texttt{model ... end} block is rejected at compile time with a clear error
+naming the class and model.
+
+\subsection{Why}
+\label{sec:orgd82ac31}
+
+An association class is simultaneously a class and an association. Every
+other multi-level construct keeps those two facets on entirely separate
+tracks -- a clabject edge refines a class one level down, an assoclink
+edge refines an association one level down, and nothing in the framework
+lets one edge do both to the same declaration at once. Giving a per-model
+association class real multi-level behavior would mean deciding what it
+means for a single declaration to be refined as a class \textbf{and} as an
+association simultaneously, including how the two refinements stay
+consistent with each other -- semantics that don't exist yet in the
+theory this tool implements. That is a research question, not an
+implementation gap, so it is intentionally out of scope.
+
+\subsection{What to write instead}
+\label{sec:orgd01f9c8}
+
+\begin{itemize}
+\item If the association class is inherently a bridge between two different
+models (or an inter-class and a model class), declare it directly in
+\texttt{inter-classes} -- this already works. See
+\texttt{examples/MLM-USE/202608282106-InterAssociationClassBridge.use}.
+\item If it's local to one model, reify the edge as an ordinary class plus
+two ordinary associations, one to each endpoint. This gives up nothing
+practical: the reified edge is still an object, so population-bound
+invariants (\texttt{allInstances()->size()}) apply to it exactly as they would
+to a real association class. (\texttt{examples/} carries no worked file for
+this pattern specifically -- it's reserved for constructs that work
+without qualification, and this one exists only because of the
+restriction above.)
+\end{itemize}
+
+\section{CatMLM's \texttt{instanceOf} only ever targets a level's declared parent}
+\label{sec:orgfab7917}
+
+\subsection{The restriction}
+\label{sec:orgf3b0a55}
+
+A CatMLM level is declared as \texttt{model ID1 < ID2}, and every clabject in
+that level instantiates a powerclass from exactly one level: \texttt{ID2}, the
+one named in that header. There is no syntax for a clabject to name a
+powerclass from any other level.
+
+\subsection{Why this isn't a gap in practice}
+\label{sec:org761e5a1}
+
+Because instanceOf is always resolved against exactly the declared
+parent's class table, reusing a class name at another level -- even at
+every level of a chain -- is never ambiguous: there is only ever one
+table consulted, so a same-named class anywhere else is simply never
+looked at. (Same-level subclassing, \texttt{<}, has the identical property for
+the unrelated reason that it's resolved purely within the declaring
+level's own table.) This is locked in as a regression test,
+\texttt{CatMLMLevelNameDuplicationTest}, which reuses one class name at every
+level of a three-level chain -- including a same-level subclass sharing
+the name too -- and checks every instantiation still resolves to exactly
+its own declared parent.
+
+Note that this is a restriction of CatMLM's front-end syntax specifically,
+not of MLM-USE's underlying multi-level model: a plain MLM-USE mediator
+names its parent model by name (\texttt{mediator Child < Parent}), with no
+adjacency requirement at all, so a lower-level class instantiating a
+class from a non-adjacent ancestor level is already expressible in plain
+MLM-USE today. CatMLM simply has no surface syntax to ask for that yet.
+
+\subsection{What to write instead}
+\label{sec:org6777e53}
+
+If a class genuinely needs to instantiate a powerclass from further up
+than its immediate CatMLM parent, drop to plain MLM-USE for that level
+and name the target model explicitly in the \texttt{mediator ... < ...}
+declaration.
+
+\section{Other CatMLM gaps (unchanged from earlier passes)}
+\label{sec:orgfc2da1e}
+
+CatMLM's \texttt{catUSE\_model} has no \texttt{operations} section, no \texttt{inter-*}
+sections (constraints/associations/classes), and no per-clabject
+attribute rename -- cancellation is only via \texttt{catAtt=/=catConstr} tags on
+the powerclass's own declaration, applying to every instantiator, not
+selectively. Drop to plain MLM-USE for any of these.
 \chapter{Worked Examples}
-\label{sec:orgab622e4}
+\label{sec:org122036d}
 This chapter is a placeholder.
 \chapter{The CatUSE-to-\LaTeX{} Study Tool}
-\label{sec:orgb931df4}
+\label{sec:orgbc5b501}
 This chapter is a placeholder.
 \part{Extending the Implementation}
-\label{sec:org745982f}
+\label{sec:org24bb1c9}
 \chapter{Codebase Tour}
-\label{sec:org92b8b93}
+\label{sec:orgc736412}
 This chapter is a placeholder.
 \chapter{The Grammar and Parser}
-\label{sec:org96052cc}
+\label{sec:org2428bfd}
 This chapter is a placeholder.
 \chapter{AST and Compilation Pipeline}
-\label{sec:orgb6762f1}
+\label{sec:org2f8cca8}
 This chapter is a placeholder.
 \chapter{The Core M-Model}
-\label{sec:org82be8e7}
+\label{sec:org2126ce5}
 This chapter is a placeholder.
 \chapter{The Multi-Model and Multi-Level-Model Classes}
-\label{sec:org1ad312f}
+\label{sec:orgf2fe246}
 This chapter is a placeholder.
 \chapter{Flattening and Rendering}
-\label{sec:org4845d5d}
+\label{sec:orga6105c5}
 This chapter is a placeholder.
 \chapter{Testing the Compiler}
-\label{sec:orga228bfe}
+\label{sec:org81ba744}
 This chapter is a placeholder.
 \chapter{Releasing a New Version and Writing Plugins}
-\label{sec:org7e48434}
+\label{sec:orgd70fe7b}
 This chapter is a placeholder.
 \part{History}
-\label{sec:orgc5ae712}
+\label{sec:orgec8e296}
 \chapter{History of USE}
-\label{sec:orgc92fa29}
+\label{sec:org0e3142d}
 This chapter is a placeholder.
 \chapter{History of the MLM-USE/CatUSE Fork}
-\label{sec:orga2d4c2e}
+\label{sec:org12fe097}
 This chapter is a placeholder.
 
 \appendix
 
 \part{Appendices}
-\label{sec:org4e718de}
+\label{sec:org781bb22}
 \chapter{The USE Grammar}
-\label{sec:orgd28d585}
+\label{sec:org6c9cadc}
 The base USE language grammar (classes, associations, OCL constraints,
 SOIL statements), with no multi-level-modeling and no CatMLM extensions.
 Reproduced verbatim from \texttt{USE.ebnf} at the repository root, which is
@@ -1169,11 +1548,20 @@ NOTES
    ShellCommandBase.gpart, builds that one instead).
 \end{lstlisting}
 \chapter{The MLM-USE Grammar}
-\label{sec:org32606a9}
+\label{sec:org18e3b8a}
 The multi-level-modeling extension, as a \textbf{delta} on top of the USE
-grammar in Appendix \ref{sec:orgd28d585}: only rules that are new or
+grammar in Appendix \ref{sec:org6c9cadc}: only rules that are new or
 changed at this layer are listed. Reproduced verbatim from
 \texttt{MLM-USE.ebnf} at the repository root.
+
+This grammar describes syntax only. A construct can parse cleanly here
+and still be rejected during semantic analysis once it's nested inside a
+multi-level model -- most notably, a \texttt{model ... end} block's classifier
+list reuses the plain USE \texttt{associationclass} rule unchanged, so an
+association class inside a \texttt{model} block parses, but is rejected at
+compile time (it's only accepted in \texttt{inter-classes}). See Chapter
+\ref{sec:org671565c} for this and the other cases where the
+grammar alone doesn't tell the whole story.
 
 \begin{lstlisting}[language=EBNF,label= ,caption= ,captionpos=b,numbers=none]
 ================================================================================
@@ -1316,9 +1704,9 @@ NOTES
    the rules above would itself produce.
 \end{lstlisting}
 \chapter{The CatMLM Grammar}
-\label{sec:org2df123a}
+\label{sec:org529f59b}
 The CatMLM (``CatUSE'') front-end syntax sugar, as a \textbf{delta} on top of
-MLM-USE (Appendix \ref{sec:org32606a9}): CatMLM desugars into
+MLM-USE (Appendix \ref{sec:org18e3b8a}): CatMLM desugars into
 exactly the same AST that plain MLM-USE produces. Reproduced verbatim
 from \texttt{CatMLM.ebnf} at the repository root.
 
@@ -1537,10 +1925,10 @@ NOTES
    of them ever call it more than once per classifier.
 \end{lstlisting}
 \chapter{Keyword Reference}
-\label{sec:org46d74f9}
+\label{sec:orgfa8ba54}
 This chapter is a placeholder.
 \chapter{Shell Command Reference}
-\label{sec:orgbffd437}
+\label{sec:org1586b85}
 This chapter is a placeholder.
 
 \backmatter

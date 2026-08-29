@@ -3,8 +3,8 @@
 :CUSTOM_ID: part-appendices
 :END:
 
-#+INCLUDE: "31-grammar-reference-use.org" :minlevel 2
-#+INCLUDE: "32-grammar-reference-mlm-use.org" :minlevel 2
-#+INCLUDE: "33-grammar-reference-catmlm.org" :minlevel 2
-#+INCLUDE: "34-keyword-reference.org" :minlevel 2
-#+INCLUDE: "35-shell-command-reference.org" :minlevel 2
+#+INCLUDE: "33-grammar-reference-use.org" :minlevel 2
+#+INCLUDE: "34-grammar-reference-mlm-use.org" :minlevel 2
+#+INCLUDE: "35-grammar-reference-catmlm.org" :minlevel 2
+#+INCLUDE: "36-keyword-reference.org" :minlevel 2
+#+INCLUDE: "37-shell-command-reference.org" :minlevel 2
