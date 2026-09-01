@@ -75,8 +75,33 @@ catUSE_model returns [ASTCatUSEModel n]
 :
     keyMLM mlmName=IDENT { $n = new ASTCatUSEModel(mlmName); }
     ( lvl=catLevel { $n.addLevel($lvl.n); } )+
+    ( 'inter-associations'
+        ( ia=interAssociationDefinition { $n.addInterAssociation($ia.n); } )*
+    )?
+    ( 'inter-constraints'
+        ( ic=interInvariant { $n.addInterConstraint($ic.n); }
+        | ip=interPrePost   { $n.addInterPrePost($ip.n); }
+        )*
+    )?
     EOF
     ;
+    /* interAssociationDefinition, interAssociationEnd, interInvariant, and
+       interPrePost are all reused completely unchanged from USEBase.gpart
+       (composed into this same CatUSE grammar -- see use-core/pom.xml's
+       "Merge CatUSE grammar" step). Mirrors USEBase.gpart's own
+       multi_model_core exactly: levels first, required, one-or-more; the
+       two inter-* sections after, each optional and at most once, in this
+       fixed order, never interleaved with catLevel or repeated. There is
+       deliberately no "inter-classes" clause here -- CatMLM does not
+       support it (see known-issues.org, Issue 9, for the consequence this
+       has for association classes specifically). There is also no
+       "catAssociation" alternative inside inter-associations: an
+       inter-association carries no cancellation semantics at all, unlike
+       its per-level namesake in catAssociationDefinition below. Every
+       class reference inside either section must be Model@Class
+       (multiType) -- inherited for free from the reused rules and from
+       MMultiModel.getClass()'s existing semantic resolution; a bare name
+       there is already a hard compile error with no new code needed. */
 
 /* ------------------------------------------------------------------
    "model ID1 [< ID2]" fuses what MLMUse splits across a `model` block

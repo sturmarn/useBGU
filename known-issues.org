@@ -11,8 +11,11 @@ Issues 5-7 while making =FlatUseTextRenderer='s flattened output
 genuinely self-contained and re-compilable, checked with a similar
 throwaway harness (=FlattenRegressionCheck=) run against every file in
 =examples/=; Issue 8 is a scope boundary noted while wiring ASSL
-generation to that same flattened output. Fixed issues are filed under
-[[#done]] below; anything still open is filed under [[#open]].
+generation to that same flattened output; Issue 9 is a scope boundary
+noted while designing CatMLM's own =inter-associations= / =inter-constraints=
+support; Issue 10 was found while empirically verifying that same new
+feature. Fixed issues are filed under [[#done]] below; anything still
+open is filed under [[#open]].
 
 * Open
 :PROPERTIES:
@@ -144,6 +147,88 @@ Deliberately left open at the user's explicit direction (2026-08-28):
 asked whether to design and implement the Shell wiring now versus
 stop at the standalone, tested =FlatUseSystemFactory= library entry
 point; the user chose to stop there for the time being.
+
+** Issue 9: CatMLM has no surface syntax at all for an association class that crosses levels [OPEN]
+
+*** Summary
+
+CatMLM now supports genuine =inter-associations= / =inter-constraints=
+sections (see Issue 10's sibling feature note, and the manual's
+chapter "The Flattening Bridge" for the flattening pipeline these feed
+into). Association classes were deliberately left
+out of that addition, and the consequence is worth stating plainly:
+after this change, CatMLM has *no* way to declare an association class
+that crosses levels -- not per-model, and not inter-level either.
+
+*** Why this is a real gap, not an oversight
+
+Association classes have exactly two possible homes in this grammar
+family, and both are closed off:
+
+- *Per-model*: an =associationclass= inside an ordinary =model ... end=
+  block is permanently, deliberately rejected at compile time (Issue 1,
+  "Considered and rejected: real multi-level support for association
+  classes" -- framed there as an open research question, not a
+  placeholder). CatMLM inherits this rejection unchanged, since a
+  =catClassifierDefinition= desugars into an ordinary =class= / =category=
+  either way.
+- *Inter-level*: the only place an association class crossing levels
+  has ever worked is plain MLM-USE's =inter-classes= section, via
+  =interAssociationClassDefinition= (Issue 6 fixed a real
+  double-printing bug in =FlatUseTextRenderer= for exactly this
+  construct, and =examples/MLM-USE/202608282106-InterAssociationClassBridge.use=
+  demonstrates it). CatMLM's new inter-level support deliberately
+  excludes =inter-classes= entirely (see Issue 10's sibling note) --
+  and the section that *was* added instead, =inter-associations= (via
+  =interAssociationDefinition=), has no association-class alternative
+  in its own grammar rule: it only ever accepts
+  =association= / =aggregation= / =composition=, never
+  =associationClass= / =associationclass=. That production lives
+  exclusively under =interGeneralClassifierDefinition=, itself only
+  reachable through =inter-classes=.
+
+So the one working case (inter-level, via =inter-classes=) is precisely
+what CatMLM's new inter-level support leaves out, and its replacement
+does not cover it. Not a blocker -- it is consistent with Issue 1's
+existing "out of scope, research question" stance for the per-model
+case -- but it is an additional, real consequence of today's two design
+decisions combined, not something the =inter-associations= /
+=inter-constraints= work resolves.
+
+A related, independently-confirmed fact worth keeping in mind for any
+future design here: USE's runtime already enforces a hard uniqueness
+constraint on link objects of an association class --
+=MSystemState.hasLinkBetweenObjects= rejects a second link object of
+the same association-class type (walking its whole generalization
+hierarchy, via =allParents()= / =allChildren()=) between an identical
+set of end objects and qualifier values, throwing "Cannot insert two
+linkobjects of the same type between one set of objects!"
+(=MSystemState.createLinkObject=, checked separately from -- and more
+strictly than -- the plain-link duplicate check). Any real multi-level
+treatment of association classes would need to say what this rule
+means across a clabject/assoclink refinement, which is exactly the
+kind of consistency question Issue 1 already flagged as unresolved.
+
+*** Suggested approaches (not implemented)
+
+1. *Minimal*: add an =associationClass= / =associationclass= alternative
+   to the (dropped, per Issue 10) inter-classes-only path, i.e. don't
+   drop inter-classes after all, at least for this one construct --
+   directly reintroduces the scope this design chose to avoid.
+2. *Targeted*: give =interAssociationDefinition= (or a CatMLM-only
+   variant of it) an association-class alternative without bringing
+   back the rest of =inter-classes= (plain inter-level classes,
+   signals) -- smaller surface, but a real new grammar production, not
+   reuse of an existing one the way the rest of Issue 10 is.
+3. *No-code option*: document as an accepted restriction; per-model
+   =associationclass= is already the documented workaround (reify as a
+   plain class plus two associations, per Issue 1's note), and nothing
+   about that workaround changes for the inter-level case either.
+
+*** Resolution: not acted on
+
+Deliberately left open, noted at the same time =inter-associations= /
+=inter-constraints= were designed and implemented (2026-09-01).
 
 * Done
 :PROPERTIES:
@@ -578,6 +663,107 @@ first time. See the manual's new chapter "The Flattening Bridge"
 for the full writeup, including what's deliberately not wired up yet
 (the interactive Shell's =gen startprocedure= command, and the bundled
 Kodkod-based model finder plugin).
+
+** Issue 10: CatMLM gained =inter-associations= / =inter-constraints=, and this exposed a real error-swallowing bug shared with plain MLM-USE [FIXED 2026-09-01]
+
+*** Summary
+
+CatMLM previously had no way at all to express a genuine cross-level
+association or constraint -- =bookshop_corrected.pl='s own =catShop=
+fact (a =catalog[1]--bookShop[*]= association crossing two levels
+directly, bypassing the clabject/category mechanism entirely) had
+nowhere to go. Fixed by adding =inter-associations= / =inter-constraints=
+sections to =catUSE_model=, reusing plain MLM-USE's
+=interAssociationDefinition= / =interInvariant= / =interPrePost= rules
+completely unchanged. =inter-classes= was deliberately left out (see
+Issue 9 for the consequence this has for association classes
+specifically), and there is deliberately no =catAssociation= flavor of
+=inter-associations= -- an inter-association carries no cancellation
+semantics at all.
+
+While empirically verifying the new sections (compiling a bare,
+non-multiType class reference inside =inter-associations= and
+confirming it was rejected, the same way plain MLM-USE already
+rejects it), the compile *succeeded* instead -- with the bad
+association just silently missing from the result. Chasing that down
+found a real, pre-existing bug in =ASTMultiLevelModel.gen()=, shared by
+plain MLM-USE and CatMLM alike, just never exercised until this
+feature's own semantic-error path was tested for the first time.
+
+*** Root cause
+
+- =ASTMultiLevelModel.gen()= creates a fresh =MultiContext multiCtx=
+  and passes it to =fMultiModel.gen(multiCtx)=, then checks only
+  whether the returned =MMultiModel= is =null=.
+- =ASTMultiModel.gen(multiCtx)= itself is in two phases: a per-model
+  loop (each internal model generated in its own sub-context that
+  correctly forwards errors into =multiCtx= via
+  =setMainContext(multiCtx)=, checked with
+  =if (multiCtx.errorCount() > 0) return null;= immediately after that
+  loop -- this part was already correct) -- followed by a second phase
+  generating the multi-model's *own* inter-level content (inter-enums,
+  inter-classes, inter-associations, inter-prePost) directly against
+  that same =multiCtx=, with =multiCtx.reportError(...)= calls but *no
+  further check of =multiCtx.errorCount()= anywhere after them* before
+  =gen()= unconditionally returns the (still non-null)
+  =MMultiModel= at the very end.
+- Back in =ASTMultiLevelModel.gen()=, since =multiCtx= was created with
+  no =setMainContext(mlmContext)= link of its own, none of those
+  second-phase errors were ever visible to =mlmContext= (the context
+  actually checked by =USECompilerMLM= / =USECompilerCatUSE='s final
+  =if (ctx.errorCount() > 0) result = null;=) at all -- they were only
+  ever printed to the shared =err= stream, never counted anywhere that
+  mattered.
+- =inter-constraints= (=interInvariant=) is unaffected by this bug: it
+  is generated later, via the separately-called
+  =ASTMultiModel.genInterConstraints(mlmContext)= (called directly
+  against =mlmContext=, after mediators are set up), which was already
+  correctly wired.
+- Confirmed the bug is genuinely pre-existing, not introduced by this
+  session's CatMLM changes: reproduced the identical silent-success
+  behavior with a hand-written *plain MLM-USE* file containing the same
+  bad bare-class-name inter-association reference, run through
+  =USECompilerMLM= directly, before touching =ASTMultiLevelModel.java=.
+
+*** Fix implemented
+
+Changed the single condition in =ASTMultiLevelModel.gen()= from
+~if (multiModel == null)~ to
+~if (multiModel == null || multiCtx.errorCount() > 0)~, reusing the
+exact same existing throw-and-catch path (and its existing "second
+generic line" behavior, see the code comment already there) rather
+than introducing new error-forwarding plumbing. Deliberately did *not*
+wire =multiCtx.setMainContext(mlmContext)= instead -- that would have
+rerouted the per-model loop's own already-correct
+=multiCtx.errorCount()= check (per-model sub-contexts forward into
+=multiCtx=, which self-counts today; forwarding =multiCtx= itself
+further upstream would silently zero out that count instead of adding
+to it), a regression the chosen fix avoids entirely.
+
+*** Verification
+
+- The hand-written plain-MLM-USE reproducer above now correctly
+  reports both lines ("Class `catalog' does not exist in this model."
+  then "error parsing multi level model") and returns =null=, instead
+  of silently compiling.
+- =CatUSETranslationRulesTest= gained five new tests for the feature
+  itself: =testInterAssociationCrossesLevels=,
+  =testInterConstraintCrossesLevels= (both positive, translating
+  =bookshop_corrected.pl='s =catShop= directly), plus three negative
+  cases enforcing the design decisions --
+  =testInterAssociationRejectsBareClassName= (this bug, now fixed),
+  =testInterClassesSectionIsRejected= (=inter-classes= has no grammar
+  rule in CatMLM at all), and
+  =testInterAssociationHasNoCatAssociationForm= (=catAssociation= has
+  no place inside =inter-associations=).
+- The new =inter-associations= / =inter-constraints= content flattens and
+  recompiles cleanly through the existing =FlatUseTextRenderer=
+  pipeline unchanged (it already handled =mlm.interAssociations()=
+  generically, from earlier plain-MLM-USE support) -- checked with the
+  same throwaway =FlattenRegressionCheck=-style render-then-recompile
+  round trip Issues 5-7 used.
+- Full =use-core= suite: 409/409 (404 -> 409, the five new tests
+  above; no regressions elsewhere).
 
 ** Addendum: CatMLM level-order / instanceOf name duplication (2026-08-28)
 :PROPERTIES:

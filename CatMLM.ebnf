@@ -42,9 +42,44 @@ are two different entry points at the Java level.
 NEW RULES
 ================================================================================
 
-catUSE_model ::= 'MLM' IDENT { catLevel }+ EOF
+catUSE_model ::= 'MLM' IDENT
+                 { catLevel }+
+                 [ 'inter-associations' { interAssociationDefinition } ]
+                 [ 'inter-constraints'
+                     { interInvariant | interPrePost }
+                 ]
+                 EOF
         (* "MLM" here is MLM-USE.ebnf's keyMLM soft keyword, reused
-           unchanged -- not redefined in this file, see below. *)
+           unchanged -- not redefined in this file, see below.
+
+           Added 2026-09-01: the two inter-* sections, mirroring
+           USE.ebnf's own multi_model_core exactly -- levels first,
+           required, one-or-more; the inter-* sections after, each
+           optional and at most once, in this fixed order, never
+           interleaved with catLevel or repeated. interAssociationDefinition,
+           interAssociationEnd, interInvariant, and interPrePost are all
+           reused completely unchanged from MLM-USE.ebnf/USE.ebnf -- no
+           new rule was written for any of them, only these two new
+           optional clauses wiring them in. Every class reference inside
+           either section must be Model@Class (multiType); a bare name
+           is rejected the same way it already is for plain MLM-USE
+           (MMultiModel.getClass()'s existing semantic resolution,
+           inherited for free).
+
+           Deliberately NOT added: an 'inter-classes' clause. CatMLM has
+           no way to declare a genuine inter-class, an inter-level
+           associationclass, or an inter-level signal -- see
+           known-issues.org, Issue 9, for the consequence this has
+           specifically for association classes (the only place one
+           ever worked, inter-classes' interAssociationClassDefinition,
+           is exactly what stays excluded).
+
+           Also deliberately absent: any "catAssociation" alternative
+           inside inter-associations. interAssociationDefinition only
+           ever accepts association/aggregation/composition (see
+           USE.ebnf) -- an inter-association carries no cancellation
+           semantics at all, unlike its per-level namesake in
+           catAssociationDefinition below. *)
 
 catLevel ::= 'model' IDENT [ '<' IDENT ]
              { catClassifierDefinition

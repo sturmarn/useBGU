@@ -1,0 +1,44 @@
+-- Demonstrates CatMLM's new "inter-associations"/"inter-constraints"
+-- sections (2026-09-01), added specifically because bookshop_corrected.pl
+-- -- a Prolog description of a real 3-level MLM model -- had one fact
+-- CatMLM previously had no syntax for at all:
+--
+--   association(catShop,_,classes([[catalog,'Catalog'],1,catalog],
+--                                  [[bookShop,'BookShop'],*,bookShop])).
+--
+-- an association crossing two levels directly, with no route through
+-- the clabject/category mechanism (a "catalog" is not itself instantiated
+-- by anything below it; it's linked to a "bookShop" directly). This file
+-- is that fact's translation, plus one inter-constraint exercising the
+-- resulting cross-level role.
+--
+-- Two levels, standing in for bookshop_corrected.pl's 'Catalog' and
+-- 'BookShop': "catalog" is a category one level below could instantiate
+-- (it isn't, here, to keep this example minimal), and "bookShop" is an
+-- ordinary class at the level below. Every reference inside
+-- inter-associations/inter-constraints must be Model@Class -- bare names
+-- are rejected exactly as they already are in plain MLM-USE.
+
+MLM InterAssocBookshopBridge
+
+model Catalog < NONE
+category catalog
+end
+category book
+end
+
+model BookShop < Catalog
+category bookShop
+end
+clabject bookCopy : book
+end
+
+inter-associations
+association catShop between
+Catalog@catalog[1] role catalog
+BookShop@bookShop[*] role bookShop
+end
+
+inter-constraints
+context Catalog@catalog inv NonEmptyCatalog:
+self.bookShop->notEmpty()

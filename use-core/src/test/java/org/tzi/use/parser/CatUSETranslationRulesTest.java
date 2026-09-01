@@ -255,4 +255,156 @@ public class CatUSETranslationRulesTest extends TestCase {
         String expected = new String(java.nio.file.Files.readAllBytes(failFile.toPath()), StandardCharsets.UTF_8).strip();
         assertEquals(expected, errBuf.toString().strip());
     }
+
+    /**
+     * Rule 5: a genuine "inter-associations" section (outside every
+     * catLevel) desugars straight through onto the ASTMultiModel, exactly
+     * as it would for plain MLM-USE -- direct translation of
+     * bookshop_corrected.pl's "catShop" fact, the case that motivated
+     * adding this section at all.
+     */
+    public void testInterAssociationCrossesLevels() {
+        MMultiLevelModel mlm = compile(
+                "MLM InterAssocSimple\n" +
+                "\n" +
+                "model Catalog < NONE\n" +
+                "category catalog\n" +
+                "end\n" +
+                "category book\n" +
+                "end\n" +
+                "\n" +
+                "model BookShop < Catalog\n" +
+                "category bookShop\n" +
+                "end\n" +
+                "clabject bookCopy : book\n" +
+                "end\n" +
+                "\n" +
+                "inter-associations\n" +
+                "association catShop between\n" +
+                "Catalog@catalog[1] role catalog\n" +
+                "BookShop@bookShop[*] role bookShop\n" +
+                "end\n");
+
+        Set<String> interAssocNames = mlm.interAssociations().stream()
+                .map(a -> a.name()).collect(Collectors.toSet());
+        assertEquals(Set.of("catShop"), interAssocNames);
+    }
+
+    /** Rule 5: "inter-constraints" crosses levels the same way. */
+    public void testInterConstraintCrossesLevels() {
+        MMultiLevelModel mlm = compile(
+                "MLM InterConstrSimple\n" +
+                "\n" +
+                "model Catalog < NONE\n" +
+                "category catalog\n" +
+                "end\n" +
+                "\n" +
+                "model BookShop < Catalog\n" +
+                "category bookShop\n" +
+                "end\n" +
+                "\n" +
+                "inter-associations\n" +
+                "association catShop between\n" +
+                "Catalog@catalog[1] role catalog\n" +
+                "BookShop@bookShop[*] role bookShop\n" +
+                "end\n" +
+                "\n" +
+                "inter-constraints\n" +
+                "context Catalog@catalog inv NonEmptyCatalog:\n" +
+                "self.bookShop->notEmpty()\n");
+
+        boolean hasIt = mlm.interInvariants().stream()
+                .anyMatch(inv -> inv.name().contains("NonEmptyCatalog"));
+        assertTrue("inter-constraints invariant should reach the multi-level model", hasIt);
+    }
+
+    /**
+     * A bare (non-multiType) class reference inside "inter-associations"
+     * must still be rejected, the same way it already is for plain
+     * MLM-USE -- proves reusing interAssociationEnd unchanged didn't
+     * accidentally loosen that existing hard-error rule.
+     */
+    public void testInterAssociationRejectsBareClassName() {
+        StringWriter errBuf = new StringWriter();
+        PrintWriter err = new PrintWriter(errBuf);
+        MMultiLevelModel mlm = USECompilerCatUSE.compileCatUSESpecification(
+                new ByteArrayInputStream((
+                        "MLM InterAssocBareNameFail\n" +
+                        "\n" +
+                        "model Catalog < NONE\n" +
+                        "category catalog\n" +
+                        "end\n" +
+                        "\n" +
+                        "model BookShop < Catalog\n" +
+                        "category bookShop\n" +
+                        "end\n" +
+                        "\n" +
+                        "inter-associations\n" +
+                        "association catShop between\n" +
+                        "catalog[1] role catalog\n" +
+                        "BookShop@bookShop[*] role bookShop\n" +
+                        "end\n").getBytes(StandardCharsets.UTF_8)),
+                "catuse-interassoc-barename.use", err, new MultiLevelModelFactory());
+        err.flush();
+
+        assertNull("a bare class name inside inter-associations must still be rejected", mlm);
+    }
+
+    /**
+     * "inter-classes" has no grammar rule in CatMLM at all -- deliberately
+     * excluded (known-issues.org, Issue 9). Confirms the exclusion is
+     * enforced by the parser, not just by convention/documentation.
+     */
+    public void testInterClassesSectionIsRejected() {
+        StringWriter errBuf = new StringWriter();
+        PrintWriter err = new PrintWriter(errBuf);
+        MMultiLevelModel mlm = USECompilerCatUSE.compileCatUSESpecification(
+                new ByteArrayInputStream((
+                        "MLM InterClassesRejected\n" +
+                        "\n" +
+                        "model Catalog < NONE\n" +
+                        "category catalog\n" +
+                        "end\n" +
+                        "\n" +
+                        "inter-classes\n" +
+                        "class Foo\n" +
+                        "end\n").getBytes(StandardCharsets.UTF_8)),
+                "catuse-interclasses-rejected.use", err, new MultiLevelModelFactory());
+        err.flush();
+
+        assertNull("inter-classes must not parse at all in CatMLM", mlm);
+    }
+
+    /**
+     * "catAssociation" has no place inside "inter-associations" -- that
+     * section reuses plain MLM-USE's interAssociationDefinition, which
+     * only ever accepts association/aggregation/composition. Confirms an
+     * inter-association genuinely carries no cancellation semantics,
+     * rather than silently accepting the keyword and ignoring it.
+     */
+    public void testInterAssociationHasNoCatAssociationForm() {
+        StringWriter errBuf = new StringWriter();
+        PrintWriter err = new PrintWriter(errBuf);
+        MMultiLevelModel mlm = USECompilerCatUSE.compileCatUSESpecification(
+                new ByteArrayInputStream((
+                        "MLM InterAssocNoCatFlavor\n" +
+                        "\n" +
+                        "model Catalog < NONE\n" +
+                        "category catalog\n" +
+                        "end\n" +
+                        "\n" +
+                        "model BookShop < Catalog\n" +
+                        "category bookShop\n" +
+                        "end\n" +
+                        "\n" +
+                        "inter-associations\n" +
+                        "catAssociation catShop between\n" +
+                        "Catalog@catalog[1] role catalog\n" +
+                        "BookShop@bookShop[*] role bookShop\n" +
+                        "end\n").getBytes(StandardCharsets.UTF_8)),
+                "catuse-interassoc-nocatflavor.use", err, new MultiLevelModelFactory());
+        err.flush();
+
+        assertNull("catAssociation must not parse inside inter-associations", mlm);
+    }
 }

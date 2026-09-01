@@ -32,7 +32,31 @@ public class ASTMultiLevelModel extends ASTMultiModel{
         try{
             MultiContext multiCtx = new MultiContext(mlmContext.filename(), mlmContext.getOut(), null, mlmContext.modelFactory());
             MMultiModel multiModel = fMultiModel.gen(multiCtx);
-            if (multiModel == null){
+            // multiModel == null covers ASTMultiModel.gen()'s own per-model
+            // loop returning early on error (e.g. a bad internal model, or
+            // the association-class-in-a-model-block rejection in
+            // MMultiLevelModel.addModel()) -- that loop's own check already
+            // works, since each per-model sub-context forwards into multiCtx
+            // via setMainContext.
+            //
+            // multiCtx.errorCount() > 0 (multiModel itself still non-null)
+            // covers everything ASTMultiModel.gen() generates AFTER that
+            // loop directly against this same multiCtx, with no further
+            // check of its own: inter-enums, inter-classes (including
+            // interAssociationClassDefinition), inter-associations, and
+            // inter-prePost. Confirmed bug (2026-09-01, found while adding
+            // CatMLM's own inter-associations support): a bad reference
+            // there -- e.g. a bare class name where Model@Class was
+            // required -- prints its error via multiCtx.reportError() but,
+            // with nothing rechecking multiCtx.errorCount() afterward, the
+            // overall compile still "succeeded", silently handing back a
+            // model with that one broken piece just missing. Pre-existing
+            // in plain MLM-USE too, just never exercised until an inter-*
+            // section's own semantic-error path was actually tested.
+            // (inter-constraints/interInvariant is unaffected -- it's
+            // generated later via the separately-called genInterConstraints,
+            // directly against mlmContext, which was already correct.)
+            if (multiModel == null || multiCtx.errorCount() > 0){
                 // NOTE: when multiModel is null because ASTMultiModel.gen()'s
                 // own per-model loop already reported a specific cause (e.g.
                 // inherited_roles_are_not_accessible_through_local_constraints

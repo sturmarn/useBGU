@@ -64,6 +64,16 @@ import java.util.Set;
  *       necessary, not optional, by an actual "Role r1 is already
  *       defined" failure hit while testing this against the ABCD
  *       example before this rule was implemented.</li>
+ *   <li>An {@code inter-associations}/{@code inter-constraints} section
+ *       (declared outside every {@code catLevel}, never inside one) passes
+ *       straight through onto the resulting {@code ASTMultiModel} --
+ *       these already parse via the identical reused
+ *       {@code interAssociationDefinition}/{@code interInvariant}/
+ *       {@code interPrePost} rules plain MLM-USE uses, so no translation
+ *       happens here at all, only forwarding. There is deliberately no
+ *       {@code inter-classes} support, and no {@code catAssociation}-style
+ *       cancellation for inter-associations -- see {@code known-issues.org}
+ *       Issue 9 for the consequence this has for association classes.</li>
  * </ol>
  *
  * @author Claude
@@ -225,6 +235,24 @@ public class USECompilerCatUSE {
             }
 
             mlm.addMediator(mediator);
+        }
+
+        // Rule 5: genuine inter-level associations/constraints (declared
+        // outside every catLevel, e.g. "inter-associations ... end") pass
+        // straight through onto the ASTMultiModel -- these are already the
+        // exact AST types (ASTAssociation/ASTConstraintDefinition/ASTPrePost)
+        // multi_model_core's own grammar actions add here for plain
+        // MLM-USE, so no translation is needed, only forwarding. Model@Class
+        // resolution, well-definedness checking, etc. are inherited for
+        // free once this AST shape matches.
+        for (ASTAssociation ia : cat.interAssociations()) {
+            multiModel.addInterAssociation(ia);
+        }
+        for (ASTConstraintDefinition ic : cat.interConstraints()) {
+            multiModel.addConstraint(ic);
+        }
+        for (ASTPrePost ip : cat.interPrePosts()) {
+            multiModel.addPrePost(ip);
         }
 
         mlm.addMultiModel(multiModel);
