@@ -103,7 +103,7 @@ public class FlatUseTextRenderer {
         }
 
         List<MClass> allClasses = new ArrayList<>();
-        for (MModel level : orderedLevels(mlm)) {
+        for (MModel level : mlm.levelsInHierarchyOrder()) {
             List<MClass> classes = new ArrayList<>(level.classes());
             classes.sort(Comparator.comparing(MClass::name));
             allClasses.addAll(classes);
@@ -139,7 +139,7 @@ public class FlatUseTextRenderer {
             }
         }
 
-        for (MModel level : orderedLevels(mlm)) {
+        for (MModel level : mlm.levelsInHierarchyOrder()) {
             List<MAssociation> assocs = new ArrayList<>(level.associations());
             assocs.sort(Comparator.comparing(MAssociation::name));
             for (MAssociation assoc : assocs) {
@@ -609,33 +609,4 @@ public class FlatUseTextRenderer {
         return sb.toString();
     }
 
-    /**
-     * Parent levels before children, using each mediator's parent link.
-     * Levels form a simple chain (each mediator has at most one parent
-     * model) in this system, so a depth-by-walking-parents sort is enough.
-     */
-    private static List<MModel> orderedLevels(MMultiLevelModel mlm) {
-        Map<String, MModel> parentOf = new HashMap<>();
-        for (MMediator mediator : mlm.mediators()) {
-            if (mediator.getParentModel() != null) {
-                parentOf.put(mediator.getCurrentModel().name(), mediator.getParentModel());
-            }
-        }
-
-        Map<String, Integer> depth = new HashMap<>();
-        for (MModel model : mlm.models()) {
-            int d = 0;
-            String curName = model.name();
-            Set<String> seen = new HashSet<>();
-            while (parentOf.containsKey(curName) && seen.add(curName)) {
-                curName = parentOf.get(curName).name();
-                d++;
-            }
-            depth.put(model.name(), d);
-        }
-
-        List<MModel> levels = new ArrayList<>(mlm.models());
-        levels.sort(Comparator.comparingInt(m -> depth.getOrDefault(m.name(), 0)));
-        return levels;
-    }
 }

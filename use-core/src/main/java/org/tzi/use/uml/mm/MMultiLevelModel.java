@@ -115,19 +115,27 @@ public class MMultiLevelModel extends MMultiModel {
         }
     }
 
+    /**
+     * The model's actual parent level, per its own mediator -- not an
+     * inference from where it happens to sit in {@link #fModelsList}.
+     * That declaration-order list has no relationship to the hierarchy
+     * at all (nothing requires a parent to be declared adjacent to, or
+     * even near, its children); the only real source of truth for
+     * "who is this model's parent" is the mediator {@code fMediators}
+     * keys by this model's own name (see {@link #addMediator}). Returns
+     * {@code null} both for an unknown model name and for a model with
+     * no mediator, or a mediator with no parent (a root level).
+     */
     public MModel getParentModel(String modelName) {
         if (!fModels.containsKey(modelName)){
             return null;
         }
 
-        MModel prevModel = null;
-        for (MModel model : fModelsList){
-            if (model.name().equals(modelName)){
-                return prevModel;
-            }
-            prevModel = model;
+        MMediator mediator = fMediators.get(modelName);
+        if (mediator == null) {
+            return null;
         }
-        return prevModel;
+        return mediator.getParentModel();
     }
 
     public void addMediator(MMediator mediator) throws Exception {
@@ -167,6 +175,47 @@ public class MMultiLevelModel extends MMultiModel {
 
     public List<MMediator> mediators(){
         return new ArrayList<>(fMediators.values());
+    }
+
+    /**
+     * Every constituent model, ordered parent-before-child -- unlike
+     * {@link #models()} (inherited unchanged from {@link MMultiModel},
+     * a {@code TreeMap<String,MModel>}'s values, so alphabetical by
+     * model name and unrelated to the hierarchy), this walks each
+     * model's own mediator chain back to its root and sorts by that
+     * depth. A model with no mediator (or whose mediator has no parent)
+     * sorts as a root, depth 0.
+     *
+     * <p>Previously reimplemented independently, verbatim, in three
+     * unrelated consumers ({@code PlantUmlDiagramGenerator},
+     * {@code MMPrintVisitor}, {@code FlatUseTextRenderer}) because
+     * {@code MMultiLevelModel} itself had no public method for this at
+     * all -- moved here so there is exactly one implementation for all
+     * three (and any future one) to share.
+     */
+    public List<MModel> levelsInHierarchyOrder() {
+        Map<String, MModel> parentOf = new HashMap<>();
+        for (MMediator mediator : mediators()) {
+            if (mediator.getParentModel() != null) {
+                parentOf.put(mediator.getCurrentModel().name(), mediator.getParentModel());
+            }
+        }
+
+        Map<String, Integer> depth = new HashMap<>();
+        for (MModel model : models()) {
+            int d = 0;
+            String curName = model.name();
+            Set<String> seen = new HashSet<>();
+            while (parentOf.containsKey(curName) && seen.add(curName)) {
+                curName = parentOf.get(curName).name();
+                d++;
+            }
+            depth.put(model.name(), d);
+        }
+
+        List<MModel> levels = new ArrayList<>(models());
+        levels.sort(Comparator.comparingInt(m -> depth.getOrDefault(m.name(), 0)));
+        return levels;
     }
 
     @Override

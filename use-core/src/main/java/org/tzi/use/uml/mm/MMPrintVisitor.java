@@ -572,7 +572,7 @@ public class MMPrintVisitor implements MMVisitor {
         println(keyword("MLM") + ws() + id(e.name()));
         println();
 
-        for (MModel level : orderedLevels(e)) {
+        for (MModel level : e.levelsInHierarchyOrder()) {
             fLocalLevels.clear();
             fLocalLevels.add(level.name());
             visitModel(level);
@@ -613,36 +613,6 @@ public class MMPrintVisitor implements MMVisitor {
             println();
         }
         fLocalLevels.clear();
-    }
-
-    /**
-     * Parent levels before children, using each mediator's parent link.
-     * Levels form a simple chain (each mediator has at most one parent
-     * model) in this system, so a depth-by-walking-parents sort is enough.
-     */
-    private static List<MModel> orderedLevels(MMultiLevelModel e) {
-        Map<String, MModel> parentOf = new HashMap<>();
-        for (MMediator mediator : e.mediators()) {
-            if (mediator.getParentModel() != null) {
-                parentOf.put(mediator.getCurrentModel().name(), mediator.getParentModel());
-            }
-        }
-
-        Map<String, Integer> depth = new HashMap<>();
-        for (MModel model : e.models()) {
-            int d = 0;
-            String curName = model.name();
-            Set<String> seen = new HashSet<>();
-            while (parentOf.containsKey(curName) && seen.add(curName)) {
-                curName = parentOf.get(curName).name();
-                d++;
-            }
-            depth.put(model.name(), d);
-        }
-
-        List<MModel> levels = new ArrayList<>(e.models());
-        levels.sort(Comparator.comparingInt(m -> depth.getOrDefault(m.name(), 0)));
-        return levels;
     }
 
     @Override

@@ -51,7 +51,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("Mediator1", personCompany1);
-            mlmApi.createMediator("Mediator2", personCompany2);
+            mlmApi.createMediator("Mediator2", personCompany2, personCompany1);
             mlmApi.createClabject("Mediator2",personCompany2 + delimiter + personClass, personCompany1 + delimiter +  personClass);
             mlmApi.createAttributeRenaming("Mediator2",
                     "CLABJECT___" + personCompany2 + delimiter + personClass + "___" + personCompany1 + delimiter +  personClass,
@@ -67,7 +67,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("Mediator1", personCompany1);
-            mlmApi.createMediator("Mediator2", personCompany2);
+            mlmApi.createMediator("Mediator2", personCompany2, personCompany1);
             mlmApi.createClabject("Mediator2",personCompany2 + delimiter + personClass, personCompany1 + delimiter +  personClass);
         } catch (Exception e) {
             e.printStackTrace();
@@ -80,7 +80,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("Mediator1", personCompany1);
-            mlmApi.createMediator("Mediator2", personCompany2);
+            mlmApi.createMediator("Mediator2", personCompany2, personCompany1);
             mlmApi.createClabject("Mediator2",personCompany2 + delimiter + personClass, personCompany1 + delimiter +  personClass);
             mlmApi.removeAttribute("Mediator2",
                     "CLABJECT___" + personCompany2 + delimiter + personClass + "___" + personCompany1 + delimiter +  personClass,
@@ -109,7 +109,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
         } catch (Exception e) {
@@ -123,7 +123,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
 
@@ -139,7 +139,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
             mlmApi.createClabject("CD","CD@E", "AB@B");
@@ -157,7 +157,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
             mlmApi.createClabject("CD","CD@E", "AB@B");
@@ -178,7 +178,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
             mlmApi.createClabject("CD","CD@E", "AB@B");
@@ -197,7 +197,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
             mlmApi.createClabject("CD","CD@E", "AB@B");
@@ -217,7 +217,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
             mlmApi.createClabject("CD","CD@E", "AB@B");
@@ -236,7 +236,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
             mlmApi.createClabject("CD","CD@E", "AB@B");
@@ -256,7 +256,7 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
+            mlmApi.createMediator("CD", "CD", "AB");
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("CD","CD@D", "AB@B");
             mlmApi.createClabject("CD","CD@E", "AB@B");
@@ -276,8 +276,8 @@ public class TestMLMUtil {
         MMultiLevelModel mlm = mlmApi.getMultiLevelModel();
         try {
             mlmApi.createMediator("AB", "AB");
-            mlmApi.createMediator("CD", "CD");
-            mlmApi.createMediator("EF", "EF");
+            mlmApi.createMediator("CD", "CD", "AB");
+            mlmApi.createMediator("EF", "EF", "CD");
 
             mlmApi.createClabject("CD","CD@C", "AB@A");
             mlmApi.createClabject("EF","EF@E", "CD@C");

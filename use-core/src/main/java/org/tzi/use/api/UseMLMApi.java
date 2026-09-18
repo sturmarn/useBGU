@@ -93,19 +93,44 @@ public class UseMLMApi extends UseMultiModelApi{
     }
 
     /**
+     * Creates a new, parentless (root-level) Mediator -- equivalent to
+     * plain MLM-USE's own "mediator ID1 &lt; NONE". See the three-argument
+     * overload below for a mediator with an actual parent; there is no
+     * way to *infer* a parent from {@code relatedModel} alone (nothing
+     * about a model's own name or position implies a hierarchy -- see
+     * {@link MMultiLevelModel#getParentModel(String)}), so a caller that
+     * needs one must say so explicitly.
+     *
+     * @param mediatorName The name of the new mediator to be created.
+     * @param relatedModel The name of the model this mediator belongs to.
+     * @return The newly created Mediator object.
+     * @throws Exception If the model does not exist.
+     */
+    public MMediator createMediator(String mediatorName, String relatedModel) throws Exception {
+        return createMediator(mediatorName, relatedModel, null);
+    }
+
+    /**
      * This method is used to create a new Mediator object and add it to the multi-level model.
      *
      * @param mediatorName The name of the new mediator to be created.
-     * @param relatedModel The name of the related model based on which the current model and its parent model are retrieved.
+     * @param relatedModel The name of the model this mediator belongs to.
+     * @param parentModelName The name of the explicitly-declared parent model, or {@code null} for none (a root level, "&lt; NONE").
      * @return The newly created Mediator object.
-     * @throws Exception If the current model does not exist.
+     * @throws Exception If the current model, or the named parent model, does not exist.
      */
-    public MMediator createMediator(String mediatorName, String relatedModel) throws Exception {
+    public MMediator createMediator(String mediatorName, String relatedModel, String parentModelName) throws Exception {
         MModel currentModel = mMultiLevelModel.getModel(relatedModel);
         if (currentModel == null) {
             throw new Exception("Model " + relatedModel + " is invalid");
         }
-        MModel parentModel = mMultiLevelModel.getParentModel(relatedModel);
+        MModel parentModel = null;
+        if (parentModelName != null) {
+            parentModel = mMultiLevelModel.getModel(parentModelName);
+            if (parentModel == null) {
+                throw new Exception("Model " + parentModelName + " is invalid");
+            }
+        }
 
         MMediator mediator = mFactory.createMediator(mediatorName);
         this.mMultiLevelModel.addMediator(mediator);
