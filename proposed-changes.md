@@ -412,8 +412,7 @@ real, correct, public way to ask for the hierarchy as a whole, not just
 
 **Tags:** levels, shell
 
-**Status:** proposed, not started. Confirmed empirically (not just from
-reading the code).
+**Status:** FIXED. Implemented and verified.
 
 **Location:** `use-gui/src/main/java/org/tzi/use/main/shell/Shell.java:1049-1057`.
 
@@ -445,13 +444,54 @@ not just unhelpful, actively misleading, since the arrow visually
 implies a parent/child relationship between whichever two models happen
 to be adjacent alphabetically.
 
-### Proposed fix
+### Fix implemented
 
-Once `MMultiLevelModel` gains a real hierarchy-ordered accessor (per the
-entry above), have `cmdInfoLevels()` call that instead of `models()`,
-and either drop the arrow decoration entirely (a flat, correctly-ordered
-list needs no fake edges) or compute real edges from `fMediators` and
-only draw an arrow where one actually exists — including handling a
-forest correctly (more than one root, printed as separate groups, not
-chained together by a stray arrow between an unrelated pair that happen
-to be printed consecutively).
+`cmdInfoLevels()` now calls `levelsInHierarchyOrder()` (the entry above)
+for the print order, and shows each level's *real* parent (via the now-
+also-fixed `getParentModel(String)`) explicitly, mirroring the source
+syntax directly (`mediator ID1 < ID2` / `< NONE`) instead of a decorative
+arrow that implied an edge without checking one:
+
+```java
+private void cmdInfoLevels() throws NoSystemException {
+    MSystem system = system();
+    MMultiLevelModel mlm = (MMultiLevelModel) system.model();
+    for (MModel model : mlm.levelsInHierarchyOrder()) {
+        MModel parent = mlm.getParentModel(model.name());
+        System.out.println(model.name() + " < " + (parent == null ? "NONE" : parent.name()));
+    }
+}
+```
+
+This handles a forest correctly for free: each root prints `<Name> <
+NONE` on its own line, with no false chaining to an unrelated tree —
+there's no shared arrow to mis-draw between two roots that happen to
+print consecutively, since each line only ever states that one model's
+own, real parent.
+
+### Verification
+
+`cmdInfoLevels()` itself has no existing test coverage to extend (no
+test directory exists for `use-gui`'s `Shell` at all), and it's a
+`private` method that prints directly to `System.out` from a live
+session — not easily unit-tested in isolation. Verified the actual new
+logic instead, by replicating it exactly against two compiled models:
+
+- The same "Alpha/Zebra" case as the `getParentModel` regression test:
+  ```
+  Zebra < NONE
+  Alpha < Zebra
+  ```
+- A genuine forest — one two-level chain (`P1 < P3`) plus two unrelated
+  standalone roots (`P2`, `Solo`) — confirming no false chaining, the
+  main defect this fix was for:
+  ```
+  P2 < NONE
+  P3 < NONE
+  Solo < NONE
+  P1 < P3
+  ```
+
+`mvn -pl use-gui -am compile` succeeds. No `use-core` test regressions
+possible (this change is confined to `use-gui`, which has no test suite
+of its own to run).

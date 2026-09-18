@@ -1048,11 +1048,18 @@ public final class Shell implements Runnable, PPCHandler {
 
 	private void cmdInfoLevels() throws NoSystemException {
 		MSystem system = system();
-		Collection<MModel> models = ((MMultiLevelModel)system.model()).models();
-		System.out.println("NONE");
-		for (MModel model : models){
-			System.out.println(" /\\ ");
-			System.out.println(model.name());
+		MMultiLevelModel mlm = (MMultiLevelModel) system.model();
+		// Previously listed models() (alphabetical, unrelated to the
+		// hierarchy) with a decorative arrow between every consecutive
+		// pair regardless of whether they were actually parent and child --
+		// see proposed-changes.md's "levels, shell"-tagged entry. Each
+		// level's own real parent (or "NONE" for a root) is now shown
+		// explicitly, mirroring the "mediator ID1 < ID2" / "< NONE" source
+		// syntax directly, so a forest of more than one root is never
+		// misrepresented as one continuous chain.
+		for (MModel model : mlm.levelsInHierarchyOrder()) {
+			MModel parent = mlm.getParentModel(model.name());
+			System.out.println(model.name() + " < " + (parent == null ? "NONE" : parent.name()));
 		}
 	}
 

@@ -95,22 +95,20 @@ in the interactive Shell that both plausibly answer "give me information
 about the level structure," worth distinguishing:
 
 - **`info levels`** (`Shell.cmdInfoLevels()`,
-  `use-gui/.../main/shell/Shell.java:1049`): lists every model via
-  `((MMultiLevelModel)system.model()).models()` and prints `"NONE"`
-  followed by `" /\ "` + the model's name for each one. Worth knowing:
-  `models()` is inherited from `MMultiModel`'s `TreeMap<String,MModel>`,
-  so this prints in **alphabetical order**, and it draws an upward arrow
-  between *every consecutive pair in that listing* regardless of whether
-  they're actually parent and child. This looks like it was meant as a
-  crude hierarchy diagram but doesn't actually consult `fMediators` at
-  all — for a model whose levels don't happen to sort alphabetically
-  into hierarchy order (or a forest with more than one root/branch), the
-  printed arrows would be actively misleading, not just uninformative.
-  **Confirmed empirically**, not just from reading the code: built a
-  model where "Alpha" is the child of "Zebra" (the root), and the exact
-  call `cmdInfoLevels()` makes prints "Alpha" first, "Zebra" second --
-  alphabetical, with the child shown before the parent it's actually
-  under. See `proposed-changes.md`'s "levels"-tagged entry for this.
+  `use-gui/.../main/shell/Shell.java:1049`) -- **now fixed.** It used to
+  list every model via `((MMultiLevelModel)system.model()).models()` and
+  print `"NONE"` followed by `" /\ "` + the model's name for each one --
+  since `models()` is inherited from `MMultiModel`'s
+  `TreeMap<String,MModel>`, that printed in **alphabetical order** with
+  an upward arrow between *every consecutive pair* regardless of whether
+  they were actually parent and child, confirmed empirically (built a
+  model where "Alpha" is the child of "Zebra" the root, and the old code
+  printed "Alpha" first, "Zebra" second). Now calls
+  `levelsInHierarchyOrder()` for the order and shows each level's real
+  parent explicitly (`Name < Parent` / `Name < NONE`), which also
+  handles a forest of more than one root correctly -- see
+  `proposed-changes.md`'s "levels, shell"-tagged entry for the fix and
+  its verification.
 - **`info level <name> [-classes|-associations|-mediator|-powerTypes]`**
   (`Shell.cmdInfoLevel()`, same file, line 1059): the real per-level
   metadata query — looks the named model up via
