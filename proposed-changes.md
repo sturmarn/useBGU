@@ -495,3 +495,104 @@ logic instead, by replicating it exactly against two compiled models:
 `mvn -pl use-gui -am compile` succeeds. No `use-core` test regressions
 possible (this change is confined to `use-gui`, which has no test suite
 of its own to run).
+
+---
+
+## `MMultiLevelModel.levelsInHierarchyOrder()` recomputes from scratch on every call, with no caching at all
+
+**Tags:** levels, performance
+
+**Status:** proposed, not started. Motivation is correctness-of-intent
+more than measured performance — see the analysis below before assuming
+this is worth doing for speed alone.
+
+**Location:** `use-core/src/main/java/org/tzi/use/uml/mm/MMultiLevelModel.java` (`levelsInHierarchyOrder()`, `mediators()`).
+
+### The finding
+
+Every call allocates fresh: `mediators()` itself does
+`new ArrayList<>(fMediators.values())`; `levelsInHierarchyOrder()` then
+builds a fresh `parentOf` map, a fresh `depth` map, a fresh `HashSet`
+per model walked, and a fresh result list, then fully re-sorts. Nothing
+from one call survives to help the next. 5000 calls means 5000 full
+recomputations, not one computation reused 5000 times.
+
+**Performance-wise, this doesn't currently matter**, and shouldn't be
+the reason to fix it: worst case is O(L²) where L is the number of
+*levels*, and L stays small in every real model in this repo (single
+digits typically). Even 5000 calls at L=20 is ~2,000,000 basic
+operations -- comfortably sub-second. Contrast with Issue 4 in
+`known-issues.org` (a real, measured caching win): that bug scaled with
+the number of *attributes/associations* (hundreds to thousands) at *high
+call frequency* (once per attribute added), a completely different
+combination from anything here.
+
+**What actually makes this worth doing is that the underlying data is
+provably static for the object's entire useful life, and the code
+doesn't reflect that.** Traced every caller of the structural mutators
+(`MMultiLevelModel.addMediator`/`removeMediator`) exhaustively via grep,
+across `use-core` and `use-gui`:
+
+- The compiler (`ASTMultiLevelModel.gen()`) calls `addMediator` only
+  during its own one-shot construction pass; nothing calls it again
+  after `gen()` returns.
+- `UseMLMApi.createMediator`'s only callers anywhere are
+  `TestMLMUtil.java`'s ~15 fixture methods, and in every one, all
+  `createMediator`/`createClabject` calls happen in one contiguous burst
+  *before* the model is returned or used by anything else.
+- `removeMediator` has no caller anywhere in this codebase at all --
+  confirmed dead code today.
+- The GUI's only "change the model" action, "Reload specification"
+  (`ActionFileRefreshSpec`), just calls the same one-shot `compile(file)`
+  pipeline -- it discards the old `MMultiLevelModel` and builds a fresh
+  one, rather than mutating the existing object's structure in place.
+  Same for the four "Open..." actions.
+
+So: every path that produces an `MMultiLevelModel` is a one-shot
+construction, and nothing in this codebase ever mutates one's structure
+again afterward -- "changing the model" always means building a new
+object, never editing a live one. That's a real, confirmed invariant,
+not an assumption.
+
+### Proposed fix
+
+A simple lazily-computed, memoized instance field is safe given the
+above -- no invalidation logic is needed at all, because the mutators
+that would require it are never called after construction completes on
+any object this codebase actually produces:
+
+```java
+private List<MModel> fCachedLevelsInHierarchyOrder;
+
+public List<MModel> levelsInHierarchyOrder() {
+    if (fCachedLevelsInHierarchyOrder == null) {
+        fCachedLevelsInHierarchyOrder = computeLevelsInHierarchyOrder();
+    }
+    return fCachedLevelsInHierarchyOrder;
+}
+```
+
+**The caveat that keeps this "proposed" rather than "obviously safe to
+just do"**: the invariant above is empirical (true of every actual
+caller *today*), not enforced by the type/API itself -- `addMediator`/
+`removeMediator` are still public and callable on an already-queried
+object; nothing stops a future caller from doing that and getting a
+silently stale cached answer. Two ways to close that gap, worth deciding
+between rather than picking by default:
+
+1. Invalidate the cache in `addMediator`/`removeMediator` too (set the
+   field back to `null`) -- cheap, and turns "must remember this
+   invariant" into "safe even if violated," at the cost of a couple of
+   extra lines at each mutation site.
+2. Give `MMultiLevelModel` an explicit sealed/frozen concept (a `finish()`
+   step the compiler and `UseMLMApi` both call once construction is
+   done, after which the structural mutators throw) -- more invasive,
+   but makes the invariant load-bearing and checked, not just
+   documented, and would also be the natural place to compute (not just
+   lazily cache) the hierarchy once, for good.
+
+Option 1 is the smaller change and is enough to make this genuinely
+safe; option 2 is the more principled fix if `MMultiLevelModel` is going
+to grow more derived, cacheable properties over time (this is likely the
+first of several, given how often "levels in hierarchy order" has
+already been independently needed).
